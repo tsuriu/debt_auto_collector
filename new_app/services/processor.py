@@ -1,0 +1,165 @@
+from datetime import datetime
+from loguru import logger
+
+class Processor:
+    def __init__(self, instance_config):
+        self.config = instance_config
+        self.instance_name = instance_config.get('instance_name', 'default')
+        self.erp_type = instance_config.get('erp', {}).get('type', 'ixc')
+        self.instance_pre_id = f"{self.instance_name}-{self.erp_type}"
+
+    def _to_int(self, val):
+        if isinstance(val, int):
+            return val
+        if isinstance(val, str) and val.isdigit():
+            return int(val)
+        return val
+
+    def _to_date(self, date_str):
+        if not date_str:
+            return None
+        if isinstance(date_str, datetime):
+            return date_str
+        try:
+            # Try ISO format (YYYY-MM-DD)
+            if '-' in date_str:
+                return datetime.strptime(date_str, "%Y-%m-%d")
+            # Try BR format (DD/MM/YYYY)
+            elif '/' in date_str:
+                return datetime.strptime(date_str, "%d/%m/%Y")
+        except Exception:
+            pass
+        return None
+
+    def validate_client(self, client):
+        if not client.get('id') or not client.get('razao'):
+            return False
+        return True
+
+    def process_clients(self, raw_clients):
+        processed = []
+        for client in raw_clients:
+            if not self.validate_client(client):
+                continue
+            
+            processed.append({
+                "id": self._to_int(client.get('id')),
+                "razao": client.get('razao'),
+                "fantasia": client.get('fantasia'),
+                "cnpj_cpf": client.get('cnpj_cpf'),
+                "data_cadastro": self._to_date(client.get('data_cadastro')),
+                "endereco": client.get('endereco'),
+                "bairro": client.get('bairro'),
+                "cidade": client.get('cidade'),
+                "estado": client.get('estado'),
+                "cep": client.get('cep'),
+                "email": client.get('email'),
+                "telefone_celular": client.get('telefone_celular'),
+                "telefone_comercial": client.get('telefone_comercial'),
+                "ramal": client.get('ramal'),
+                "id_condominio": self._to_int(client.get('id_condominio')),
+                "whatsapp": client.get('whatsapp'),
+                "participa_pre_cobranca": client.get('participa_pre_cobranca'),
+                "ativo": client.get('ativo'),
+                "data_ultima_alteracao": datetime.now()
+            })
+        return processed
+
+    def calculate_days_until_due(self, due_date_obj):
+        if not due_date_obj:
+            return None
+        try:
+            today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+            due = due_date_obj.replace(hour=0, minute=0, second=0, microsecond=0)
+            delta = (due - today).days
+            return delta
+        except Exception:
+            return None
+
+    def process_bills(self, raw_bills):
+        processed = []
+        for bill in raw_bills:
+            try:
+                # Convert values
+                valor = float(bill.get('valor', 0))
+                valor_aberto = float(bill.get('valor_aberto', 0)) or valor
+                
+                # Parse dates first
+                d_vencimento = self._to_date(bill.get('data_vencimento'))
+                d_emissao = self._to_date(bill.get('data_emissao'))
+                d_pagamento = self._to_date(bill.get('pagamento_data')) # if exists
+
+                days_until_due = self.calculate_days_until_due(d_vencimento)
+                
+                processed_bill = {
+                    "id": self._to_int(bill.get('id')),
+                    "nn_boleto": bill.get('nn_boleto'),
+                    "status": bill.get('status'),
+                    "pagamento_data": d_pagamento,
+                    "data_emissao": d_emissao,
+                    "data_vencimento": d_vencimento,
+                    "valor": valor,
+                    "valor_aberto": valor_aberto,
+                    "id_contrato": self._to_int(bill.get('id_contrato')),
+                    "id_cliente": self._to_int(bill.get('id_cliente')),
+                    "dias_vencimento": days_until_due,
+                    "vencimento_status": 'expired' if days_until_due is not None and days_until_due < 0 else 'current',
+                    "expired_age": abs(days_until_due) if days_until_due is not None and days_until_due < 0 else 0,
+                    "data_processamento": datetime.now()
+                }
+                
+                processed.append(processed_bill)
+            except Exception as e:
+                logger.warning(f"Skipping invalid bill: {e}")
+                
+        return processed
+
+    def merge_data(self, bills, clients):
+        # Index clients by ID for fast lookup
+        # Ensure ID keys are strings for matching if clients came from DB (where they might depend on how they were stored)
+        # But we just enforced ints in process_clients.
+        # If 'clients' comes from MongoDB find(), and we stored them as Int, they are Int.
+        client_map = {str(c['id']): c for c in clients}
+        
+        merged_charges = []
+        
+        for bill in bills:
+            # Filter: only if expired_age > 0 (expired)
+            if bill.get('expired_age', 0) <= 0:
+                continue
+                
+            # Filter: must not be paid
+            if bill.get('status') == 'R':
+                continue
+
+            client_id = str(bill.get('id_cliente'))
+            client = client_map.get(client_id)
+            
+            if not client:
+                continue
+
+            # Additional keys from client
+            merged_bill = bill.copy()
+            merged_bill.update({
+                "telefone_celular": client.get('telefone_celular', ''),
+                "telefone_comercial": client.get('telefone_comercial', ''),
+                "whatsapp": client.get('whatsapp', ''),
+                "razao": client.get('razao', ''),
+                "fantasia": client.get('fantasia', ''),
+                "bairro": client.get('bairro', ''),
+                "endereco": client.get('endereco', ''),
+                "cnpj_cpf": client.get('cnpj_cpf', ''),
+                "id_condominio": client.get('id_condominio', ''),
+                "ativo": client.get('ativo', ''),
+                "participa_pre_cobranca": client.get('participa_pre_cobranca', '')
+            })
+            
+            # Unique ID
+            merged_bill['full_id'] = f"{self.instance_pre_id}-{client_id}-{bill['id']}"
+            merged_bill['instance_name'] = self.instance_name
+            merged_bill['erp_type'] = self.erp_type
+            merged_bill['last_updated'] = datetime.now()
+            
+            merged_charges.append(merged_bill)
+            
+        return merged_charges

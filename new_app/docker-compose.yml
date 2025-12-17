@@ -1,0 +1,27 @@
+version: '3.8'
+
+services:
+  app:
+    build: .
+    container_name: debt_collector_app
+    restart: unless-stopped
+    depends_on:
+      - mongo
+    environment:
+      - MONGO_URI=mongodb://mongo:27017/debt_collector
+      - TZ=America/Maceio
+    volumes:
+      - .:/app
+    command: python main.py --job service
+
+  mongo:
+    image: mongo:latest
+    container_name: debt_collector_mongo
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+
+volumes:
+  mongo_data:

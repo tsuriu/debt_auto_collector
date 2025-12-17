@@ -1,0 +1,273 @@
+import time, sys
+import schedule
+from datetime import datetime
+from loguru import logger
+from config import Config
+from database import Database, get_active_instances
+from services.ixc_client import IxcClient
+from services.processor import Processor
+from services.dialer import Dialer
+
+def _get_instance_full_id(instance):
+    name = instance.get('instance_name', 'default')
+    erp_type = instance.get('erp', {}).get('type', 'ixc')
+    oid = str(instance.get('_id', ''))
+    return f"{name}-{erp_type}-{oid}"
+
+def run_clients_update_job():
+    logger.info("Starting Job: CLIENTS UPDATE")
+    instances = get_active_instances()
+    
+    for instance in instances:
+        try:
+            instance_full_id = _get_instance_full_id(instance)
+            logger.info(f"Processing instance: {instance.get('instance_name')} (ID: {instance_full_id})")
+            
+            client = IxcClient(instance)
+            processor = Processor(instance)
+            db = Database().get_db()
+            
+            # Fetch
+            raw_clients = client.get_clients()
+            logger.info(f"Fetched {len(raw_clients)} clients")
+            
+            # Process
+            processed_clients = processor.process_clients(raw_clients)
+            
+            if processed_clients:
+                from pymongo import UpdateOne
+                ops = []
+                for c in processed_clients:
+                    c['instance_full_id'] = instance_full_id
+                    # Key by instance + client ID to ensure uniqueness per instance
+                    ops.append(
+                        UpdateOne(
+                            {"instance_full_id": instance_full_id, "id": c['id']},
+                            {"$set": c},
+                            upsert=True
+                        )
+                    )
+                
+                if ops:
+                    db.clients.bulk_write(ops)
+                    logger.info(f"Saved/Updated {len(ops)} clients to 'clients' collection")
+                
+                # Update Metadata
+                db.data_refeence.update_one(
+                    {"instance_full_id": instance_full_id},
+                    {"$set": {
+                        "instance_full_id": instance_full_id,
+                        "instance_name": instance.get('instance_name'),
+                        "last_clients_update": datetime.now().isoformat()
+                    }},
+                    upsert=True
+                )
+                
+            logger.info(f"Instance {instance.get('instance_name')} - Clients Job Finished.")
+            
+        except Exception as e:
+            logger.error(f"Error in Clients Job for {instance.get('instance_name')}: {e}")
+
+def run_bills_update_job():
+    logger.info("Starting Job: BILLS UPDATE")
+    instances = get_active_instances()
+    
+    for instance in instances:
+        try:
+            instance_full_id = _get_instance_full_id(instance)
+            logger.info(f"Processing instance: {instance.get('instance_name')}")
+            
+            client = IxcClient(instance)
+            processor = Processor(instance)
+            db = Database().get_db()
+            
+            # Fetch Bills
+            raw_bills = client.get_bills()
+            processed_bills = processor.process_bills(raw_bills)
+            
+            # Fetch Clients from 'clients' collection
+            # We need all clients for this instance to merge data
+            # To avoid memory issues with huge sets, we might need optimization later, 
+            # but for now fetching instance clients (e.g. 20k) is okay in 2025 python.
+            instance_clients = list(db.clients.find({"instance_full_id": instance_full_id}))
+            
+            if not instance_clients:
+                logger.warning(f"No clients found in 'clients' collection for {instance_full_id}. Skipping merge.")
+            
+            # Merge / Create Charges
+            charges = processor.merge_data(processed_bills, instance_clients)
+            
+            if charges:
+                from pymongo import UpdateOne
+                ops = []
+                for charge in charges:
+                    # 'full_id' is already unique per bill (created in processor.merge_data)
+                    # Include instance_full_id just in case for easy querying
+                    charge['instance_full_id'] = instance_full_id
+                    ops.append(
+                        UpdateOne(
+                            {"full_id": charge["full_id"]},
+                            {"$set": charge},
+                            upsert=True
+                        )
+                    )
+                
+                if ops:
+                    db.bills.bulk_write(ops)
+                    logger.info(f"Saved/Updated {len(ops)} bills to 'bills' collection")
+                    
+                # Update Metadata
+                db.data_refeence.update_one(
+                    {"instance_full_id": instance_full_id},
+                    {"$set": {
+                        "instance_full_id": instance_full_id,
+                        "last_bills_update": datetime.now().isoformat()
+                    }},
+                    upsert=True
+                )
+                    
+            logger.info(f"Instance {instance.get('instance_name')} - Bills Job Finished.")
+
+        except Exception as e:
+            logger.error(f"Error in Bills Job for {instance.get('instance_name')}: {e}")
+
+def run_dialer_job():
+    logger.info("Starting Job: DIALER")
+    instances = get_active_instances()
+    
+    for instance in instances:
+        try:
+            instance_full_id = _get_instance_full_id(instance)
+            dialer = Dialer(instance)
+            db = Database().get_db()
+            
+            if not dialer.check_window():
+                logger.info(f"Skipping dialer for {instance.get('instance_name')} (Outside Window)")
+                continue
+            
+            # Fetch bills from 'bills' collection
+            # Query: instance_full_id AND vencimento_status='expired'
+            # Note: expired_age logic is also filtered in build_queue, but efficient query helps
+            query = {
+                "instance_full_id": instance_full_id,
+                "vencimento_status": "expired"
+            }
+            
+            bills = list(db.bills.find(query))
+            
+            if not bills:
+                logger.info(f"No expired bills found for {instance.get('instance_name')}")
+                continue
+
+            queue = dialer.build_queue(bills)
+            
+            logger.info(f"Queue for {instance.get('instance_name')}: {len(queue)} calls")
+            
+            count = 0
+            for call in queue:
+                if count >= 10:
+                    break
+                
+                # Check 4h window again (just in case multiple numbers for same client in queue)
+                # Although queue builder handles it, `dialer.trigger_call` updates the map.
+                # But `dialer.trigger_call` doesn't check `can_call_number`, it just dials.
+                # Ideally we check inside loop? 
+                # Let's trust build_queue for now, or add check if strict. 
+                # `dialer.trigger_call` tracks `number_last_called`.
+                
+                if dialer.trigger_call(call):
+                    count += 1
+                    
+                    # Add History to Bills
+                    bill_ids = call.get('bill_ids', [])
+                    if bill_ids:
+                        history_entry = {
+                            "occurred_at": datetime.now(),
+                            "number": call['contact'],
+                            "status": "triggered"
+                        }
+                        db.bills.update_many(
+                            {"full_id": {"$in": bill_ids}},
+                            {"$push": {"call_history": history_entry}}
+                        )
+                        logger.debug(f"Updated history for {len(bill_ids)} bills.")
+                        
+                    time.sleep(1)
+            
+            logger.info(f"Triggered {count} calls for {instance.get('instance_name')}")
+
+        except Exception as e:
+            logger.error(f"Error in Dialer Job for {instance.get('instance_name')}: {e}")
+
+def main():
+    import argparse
+    
+    parser = argparse.ArgumentParser(description="Debt Collector Service")
+    parser.add_argument(
+        "--job", 
+        choices=["clients", "bills", "dialer", "service"], 
+        default="service",
+        help="Run a specific job manually (once) or start the long-running service (default)"
+    )
+    parser.add_argument(
+        "--debug", 
+        action="store_true",
+        help="Enable debug logging and behavior"
+    )
+    args = parser.parse_args()
+
+    # Configure Loguru
+    logger.remove() # Remove default handler
+    log_level = "DEBUG" if (args.debug or Config.DEBUG) else "INFO"
+    logger.add(sys.stderr, level=log_level)
+    
+    if args.debug:
+        logger.debug("Debug mode enabled via CLI")
+
+    logger.info(f"Starting application in mode: {args.job.upper()}")
+
+    if args.job == "clients":
+        run_clients_update_job()
+        return
+
+    if args.job == "bills":
+        run_bills_update_job()
+        return
+
+    if args.job == "dialer":
+        run_dialer_job()
+        return
+
+    # Service / Scheduler Mode
+    if args.job == "service":
+        logger.info("Auto Debt Collector Service Started (Daemon Mode)")
+        
+        # Schedule definitions
+        schedule.every().day.at("07:00").do(run_clients_update_job)
+        schedule.every(1).hours.do(run_bills_update_job)
+        
+        # Dialer: every 20 minutes between 8-18 (handled by check_window inside job)
+        schedule.every(20).minutes.do(run_dialer_job)
+        
+        # Run immediately on startup for debug/verification if debug is ON
+        if args.debug or Config.DEBUG:
+            logger.warning("DEBUG MODE: Running all jobs immediately for verification")
+            try:
+                # Connectivity check
+                db = Database().get_db()
+                db.command("ping")
+                logger.debug("MongoDB connection successful")
+                
+                run_clients_update_job()
+                run_bills_update_job()
+                run_dialer_job()
+            except Exception as e:
+                logger.critical(f"Startup verification failed (likely Database error): {e}")
+                sys.exit(1)
+        
+        while True:
+            schedule.run_pending()
+            time.sleep(10)
+
+if __name__ == "__main__":
+    main()
