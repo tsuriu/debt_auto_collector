@@ -11,7 +11,7 @@ services:
       - MONGO_URI=mongodb://mongo:27017/debt_collector
       - TZ=America/Maceio
     volumes:
-      - .:/app
+      - ./app:/app
     command: python main.py --job service
 
   mongo:
