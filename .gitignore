@@ -1,0 +1,6 @@
+# Ignore everything
+*
+
+# Whitelist new_app and this file
+!new_app/
+!.gitignore
