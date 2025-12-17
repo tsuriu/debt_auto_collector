@@ -78,9 +78,9 @@ class IxcClient:
     def get_clients(self):
         # topic === "update_clients" logic
         query_params = {
-            "qtype": "cliente.id",
-            "query": "1",
-            "oper": ">",
+            "qtype": "cliente.ativo",
+            "query": "S",
+            "oper": "=",
             "sortname": "cliente.id",
             "sortorder": "asc",
             "grid_param": json.dumps([
@@ -106,7 +106,7 @@ class IxcClient:
             "sortorder": "asc",
             "grid_param": json.dumps([
                 {"TB": "fn_areceber.liberado", "OP": "=", "P": "S"},
-                {"TB": "fn_areceber.status", "OP": "!=", "P": "C"},
+                {"TB": "fn_areceber.status", "OP": "=", "P": "A"},
                 {"TB": "fn_areceber.filial_id", "OP": "!=", "P": "3"},
                 {"TB": "fn_areceber.data_vencimento", "OP": ">", "P": format_date(past_date)}
             ])

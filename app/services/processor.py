@@ -128,9 +128,19 @@ class Processor:
             if bill.get('expired_age', 0) <= 0:
                 continue
                 
-            # Filter: must not be paid
-            if bill.get('status') == 'R':
-                continue
+            # Filter: only if expired_age > 0 (expired) OR status is 'R' (Paid)
+            # We want to catch payments (R) even if not "expired" in our logic, so we can update DB and eventually delete.
+            # But the user logic "if bill already exist in db and status if different of A must be updated"
+            # implies we should pass everything that IS NOT 'A' (Open) + everything that IS expired?
+            # actually, simplest is: pass everything that is relevant. 
+            # If we want to UPDATE status to 'R', we must pass 'R'.
+            
+            # The original logic skipped R. Now we allow it.
+            # We also skip if expired_age <= 0 UNLESS it is paid?
+            # User requirement: "if bill already exist in db and status if different of A must be updated"
+            
+            # Let's relax filters.
+            # if bill.get('status') == 'R': continue  <-- REMOVED
 
             client_id = str(bill.get('id_cliente'))
             client = client_map.get(client_id)

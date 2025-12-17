@@ -127,7 +127,6 @@ class Dialer:
         endpoint = f"{channel_type}/{trunk}/{number}"
         
         url = f"{schema}://{host}:{port}/ari/channels"
-        
         # CallerID format: "ClientID - ClientName"
         # Node-RED: `${clientId} - ${callData.callerId}` where callData.callerId is name?
         # In build_queue, we set 'client_name', so let's use that.

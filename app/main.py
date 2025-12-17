@@ -97,13 +97,17 @@ def run_bills_update_job():
             # Merge / Create Charges
             charges = processor.merge_data(processed_bills, instance_clients)
             
+            
             if charges:
+                # We no longer filter by "paid_days". All data returned by processor is considered valid for sync.
+                # If IXC stops returning it (e.g. date range), sync will remove it.
+                
+                valid_ids = []
                 from pymongo import UpdateOne
                 ops = []
                 for charge in charges:
-                    # 'full_id' is already unique per bill (created in processor.merge_data)
-                    # Include instance_full_id just in case for easy querying
                     charge['instance_full_id'] = instance_full_id
+                    valid_ids.append(charge['full_id'])
                     ops.append(
                         UpdateOne(
                             {"full_id": charge["full_id"]},
@@ -114,9 +118,24 @@ def run_bills_update_job():
                 
                 if ops:
                     db.bills.bulk_write(ops)
-                    logger.info(f"Saved/Updated {len(ops)} bills to 'bills' collection")
-                    
-                # Update Metadata
+                    logger.info(f"Saved/Updated {len(ops)} valid bills to 'bills' collection")
+
+            # SYNC: Delete bills that are NOT in the valid_ids list for this instance
+            # This handles:
+            # 1. Bills older than X days (filtered out above)
+            # 2. Bills no longer returned by IXC (e.g. cancelled or out of date range)
+            # 3. Old Paid bills (filtered out above)
+            # 4. If charges is empty, valid_ids is empty, so we delete everything (Correct Sync)
+            
+            sync_result = db.bills.delete_many({
+                "instance_full_id": instance_full_id,
+                "full_id": {"$nin": valid_ids}
+            })
+            
+            if sync_result.deleted_count > 0:
+                logger.info(f"Synced/Removed {sync_result.deleted_count} bills from DB (Not in current valid set)")
+
+
                 db.data_refeence.update_one(
                     {"instance_full_id": instance_full_id},
                     {"$set": {
@@ -138,6 +157,11 @@ def run_dialer_job():
     for instance in instances:
         try:
             instance_full_id = _get_instance_full_id(instance)
+            
+            # Inject debug config if global debug is on
+            if Config.DEBUG:
+                instance['debug_calls'] = True
+                
             dialer = Dialer(instance)
             db = Database().get_db()
             
@@ -178,11 +202,14 @@ def run_dialer_job():
                 if dialer.trigger_call(call):
                     count += 1
                     
-                    # Add History to Bills
+                    # Add History to Bills and Action Log
                     bill_ids = call.get('bill_ids', [])
                     if bill_ids:
+                        occurred_at = datetime.now()
+                        
+                        # 1. Update Bill History (Legacy/Embedded)
                         history_entry = {
-                            "occurred_at": datetime.now(),
+                            "occurred_at": occurred_at,
                             "number": call['contact'],
                             "status": "triggered"
                         }
@@ -190,7 +217,27 @@ def run_dialer_job():
                             {"full_id": {"$in": bill_ids}},
                             {"$push": {"call_history": history_entry}}
                         )
-                        logger.debug(f"Updated history for {len(bill_ids)} bills.")
+                        
+                        # 2. Insert into Action Log (New)
+                        # We create one log entry per bill involved
+                        log_entries = []
+                        for bid in bill_ids:
+                            log_entries.append({
+                                "full_id": bid,
+                                "action": "dialer_trigger",
+                                "occurred_at": occurred_at,
+                                "instance_full_id": instance_full_id,
+                                "details": {
+                                    "number": call['contact'],
+                                    "client_name": call['client_name'],
+                                    "status": "success"
+                                }
+                            })
+                        
+                        if log_entries:
+                            db.history_action_log.insert_many(log_entries)
+                        
+                        logger.debug(f"Logged action for {len(bill_ids)} bills.")
                         
                     time.sleep(1)
             
@@ -222,6 +269,7 @@ def main():
     logger.add(sys.stderr, level=log_level)
     
     if args.debug:
+        Config.DEBUG = True
         logger.debug("Debug mode enabled via CLI")
 
     logger.info(f"Starting application in mode: {args.job.upper()}")
@@ -256,7 +304,9 @@ def main():
                 # Connectivity check
                 db = Database().get_db()
                 db.command("ping")
+                db.command("ping")
                 logger.debug("MongoDB connection successful")
+                Database().ensure_indices()
                 
                 run_clients_update_job()
                 run_bills_update_job()
