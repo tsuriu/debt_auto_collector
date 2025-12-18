@@ -49,8 +49,22 @@ def run_clients_update_job():
                     )
                 
                 if ops:
-                    db.clients.bulk_write(ops)
+                    res = db.clients.bulk_write(ops)
                     logger.info(f"Saved/Updated {len(ops)} clients to 'clients' collection")
+                    
+                    # Log Stats
+                    db.history_action_log.insert_one({
+                        "instance_full_id": instance_full_id,
+                        "action": "job_clients_stats",
+                        "occurred_at": datetime.now(),
+                        "details": {
+                            "fetched": len(raw_clients),
+                            "upserted": res.upserted_count,
+                            "modified": res.modified_count,
+                            "matched": res.matched_count,
+                            "deleted": 0
+                        }
+                    })
                 
                 # Update Metadata
                 db.data_refeence.update_one(
@@ -117,33 +131,51 @@ def run_bills_update_job():
                     )
                 
                 if ops:
-                    db.bills.bulk_write(ops)
+                    res = db.bills.bulk_write(ops)
                     logger.info(f"Saved/Updated {len(ops)} valid bills to 'bills' collection")
+                    
+                    upserted_count = res.upserted_count
+                    modified_count = res.modified_count
+                    matched_count = res.matched_count
+                else:
+                    upserted_count = 0
+                    modified_count = 0
+                    matched_count = 0
 
             # SYNC: Delete bills that are NOT in the valid_ids list for this instance
-            # This handles:
-            # 1. Bills older than X days (filtered out above)
-            # 2. Bills no longer returned by IXC (e.g. cancelled or out of date range)
-            # 3. Old Paid bills (filtered out above)
-            # 4. If charges is empty, valid_ids is empty, so we delete everything (Correct Sync)
-            
             sync_result = db.bills.delete_many({
                 "instance_full_id": instance_full_id,
                 "full_id": {"$nin": valid_ids}
             })
             
-            if sync_result.deleted_count > 0:
-                logger.info(f"Synced/Removed {sync_result.deleted_count} bills from DB (Not in current valid set)")
+            deleted_count = sync_result.deleted_count
+            if deleted_count > 0:
+                logger.info(f"Synced/Removed {deleted_count} bills from DB (Not in current valid set)")
 
+            # Log Stats
+            # Only log if there was any activity to avoid noise? Or always log for heartbeat?
+            # User asked for "counts", implying regular stats.
+            db.history_action_log.insert_one({
+                "instance_full_id": instance_full_id,
+                "action": "job_bills_stats",
+                "occurred_at": datetime.now(),
+                "details": {
+                    "fetched": len(processed_bills), # raw_bills is processed_bills essentially
+                    "upserted": upserted_count,
+                    "modified": modified_count, 
+                    "matched": matched_count,
+                    "deleted": deleted_count
+                }
+            })
 
-                db.data_refeence.update_one(
-                    {"instance_full_id": instance_full_id},
-                    {"$set": {
-                        "instance_full_id": instance_full_id,
-                        "last_bills_update": datetime.now().isoformat()
-                    }},
-                    upsert=True
-                )
+            db.data_refeence.update_one(
+                {"instance_full_id": instance_full_id},
+                {"$set": {
+                    "instance_full_id": instance_full_id,
+                    "last_bills_update": datetime.now().isoformat()
+                }},
+                upsert=True
+            )
                     
             logger.info(f"Instance {instance.get('instance_name')} - Bills Job Finished.")
 

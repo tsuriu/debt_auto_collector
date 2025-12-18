@@ -130,7 +130,14 @@ class Dialer:
         # CallerID format: "ClientID - ClientName"
         # Node-RED: `${clientId} - ${callData.callerId}` where callData.callerId is name?
         # In build_queue, we set 'client_name', so let's use that.
-        caller_id = f"{client_id} - {call_data['client_name']}"
+        # UPDATE: User requested "callerId must be full_id from bills document"
+        
+        bill_ids = call_data.get('bill_ids', [])
+        if bill_ids:
+            caller_id = str(bill_ids[0])
+        else:
+             # Fallback if no bill_ids (shouldn't happen given build_queue logic)
+            caller_id = f"{client_id} - {call_data['client_name']}"
         
         payload = {
             "endpoint": endpoint,
