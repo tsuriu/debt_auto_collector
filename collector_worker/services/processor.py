@@ -31,6 +31,24 @@ class Processor:
             pass
         return None
 
+    def _get_tipo_pessoa(self, client):
+        # Try direct fields
+        val = client.get('tipo_pessoa') or client.get('pessoa')
+        if val:
+            return val
+            
+        # Try deriving from CNPJ/CPF -> REMOVED
+        # doc = client.get('cnpj_cpf', '')
+        # if not doc:
+        #    return 'F' 
+            
+        # Clean digits
+        # digits = ''.join(c for c in str(doc) if c.isdigit())
+        
+        # if len(digits) > 11:
+        #    return 'J' 
+        return 'F' # Default fallback
+
     def validate_client(self, client):
         if not client.get('id') or not client.get('razao'):
             return False
@@ -46,7 +64,6 @@ class Processor:
                 "id": self._to_int(client.get('id')),
                 "razao": client.get('razao'),
                 "fantasia": client.get('fantasia'),
-                "cnpj_cpf": client.get('cnpj_cpf'),
                 "data_cadastro": self._to_date(client.get('data_cadastro')),
                 "endereco": client.get('endereco'),
                 "bairro": client.get('bairro'),
@@ -61,7 +78,7 @@ class Processor:
                 "whatsapp": client.get('whatsapp'),
                 "participa_pre_cobranca": client.get('participa_pre_cobranca'),
                 "ativo": client.get('ativo'),
-                "tipo_pessoa": client.get('tipo_pessoa') or client.get('pessoa'),
+                "tipo_pessoa": self._get_tipo_pessoa(client),
                 "data_ultima_alteracao": datetime.now()
             })
         return processed
@@ -149,8 +166,6 @@ class Processor:
             if not client:
                 continue
 
-            logger.info(client)
-
             # Additional keys from client
             merged_bill = bill.copy()
             merged_bill.update({
@@ -161,7 +176,6 @@ class Processor:
                 "fantasia": client.get('fantasia', ''),
                 "bairro": client.get('bairro', ''),
                 "endereco": client.get('endereco', ''),
-                "cnpj_cpf": client.get('cnpj_cpf', ''),
                 "id_condominio": client.get('id_condominio', ''),
                 "ativo": client.get('ativo', ''),
                 "participa_pre_cobranca": client.get('participa_pre_cobranca', ''),

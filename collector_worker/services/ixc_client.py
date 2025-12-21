@@ -85,6 +85,7 @@ class IxcClient:
             "sortorder": "asc",
             "grid_param": json.dumps([
                 {"TB": "cliente.id", "OP": "!=", "P": "1"},
+                {"TB": "cliente.tipo_pessoa", "OP": "!=", "P": "J"},
                 {"TB": "cliente.filial_id", "OP": "!=", "P": "3"}
             ])
         }

@@ -67,6 +67,28 @@ def run_clients_update_job():
                             "deleted": 0
                         }
                     })
+
+                # SYNC: Delete clients that are NOT in the current processed list for this instance
+                # This ensures clients filtered out (e.g. tipo_pessoa != J) or inactive are removed.
+                valid_ids = [c['id'] for c in processed_clients]
+                sync_result = db.clients.delete_many({
+                    "instance_full_id": instance_full_id,
+                    "id": {"$nin": valid_ids}
+                })
+                
+                deleted_count = sync_result.deleted_count
+                if deleted_count > 0:
+                    logger.info(f"Synced/Removed {deleted_count} clients from DB (Not in current valid set)")
+                    
+                    # Log cleanup stats
+                    db.history_action_log.insert_one({
+                        "instance_full_id": instance_full_id,
+                        "action": "job_clients_cleanup",
+                        "occurred_at": datetime.now(),
+                        "details": {
+                            "deleted": deleted_count
+                        }
+                    })
                 
                 # Update Metadata
                 db.data_refeence.update_one(
