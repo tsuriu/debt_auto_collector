@@ -21,6 +21,9 @@ wheels/
 *.egg
 MANIFEST
 
+# Temporary files
+temporary_files/
+
 # Virtual Environment
 .env
 .venv
