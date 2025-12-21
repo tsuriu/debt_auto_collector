@@ -1,0 +1,44 @@
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__/
+*.py[cod]
+*.so
+.Python
+build/
+dist/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environment
+.venv/
+env/
+venv/
+
+# Environment Variables (Important: Do not bake secrets into the image)
+.env
+.env.*
+
+# Temporary files
+temporary_files/
+
+# IDEs
+.idea/
+.vscode/
+
+# System
+.DS_Store
+
+# Docker
+docker-compose.yml
+docker-compose.override.yml
+.dockerignore
+
+# Mongo Data
+mongo_data/
+
+# Logs and other artifacts
+*.log
