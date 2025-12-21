@@ -6,7 +6,9 @@ from config import Config
 from database import Database, get_active_instances
 from services.ixc_client import IxcClient
 from services.processor import Processor
+from services.processor import Processor
 from services.dialer import Dialer
+from services.report_service import ReportService
 
 def _get_instance_full_id(instance):
     name = instance.get('instance_name', 'default')
@@ -278,13 +280,26 @@ def run_dialer_job():
         except Exception as e:
             logger.error(f"Error in Dialer Job for {instance.get('instance_name')}: {e}")
 
+def run_reports_update_job():
+    logger.info("Starting Job: REPORTS UPDATE")
+    instances = get_active_instances()
+    
+    for instance in instances:
+        try:
+            logger.info(f"Processing reports for instance: {instance.get('instance_name')}")
+            service = ReportService(instance)
+            service.process()
+            logger.info(f"Report job finished for {instance.get('instance_name')}")
+        except Exception as e:
+            logger.error(f"Error in Report Job for {instance.get('instance_name')}: {e}")
+
 def main():
     import argparse
     
     parser = argparse.ArgumentParser(description="Debt Collector Service")
     parser.add_argument(
         "--job", 
-        choices=["clients", "bills", "dialer", "service"], 
+        choices=["clients", "bills", "dialer", "reports", "service"], 
         default="service",
         help="Run a specific job manually (once) or start the long-running service (default)"
     )
@@ -318,6 +333,10 @@ def main():
         run_dialer_job()
         return
 
+    if args.job == "reports":
+        run_reports_update_job()
+        return
+
     # Service / Scheduler Mode
     if args.job == "service":
         logger.info("Auto Debt Collector Service Started (Daemon Mode)")
@@ -325,6 +344,7 @@ def main():
         # Schedule definitions
         schedule.every().day.at("07:00").do(run_clients_update_job)
         schedule.every(1).hours.do(run_bills_update_job)
+        schedule.every(5).minutes.do(run_reports_update_job)
         
         # Dialer: every 20 minutes between 8-18 (handled by check_window inside job)
         schedule.every(20).minutes.do(run_dialer_job)
@@ -342,6 +362,7 @@ def main():
                 
                 run_clients_update_job()
                 run_bills_update_job()
+                run_reports_update_job()
                 run_dialer_job()
             except Exception as e:
                 logger.critical(f"Startup verification failed (likely Database error): {e}")

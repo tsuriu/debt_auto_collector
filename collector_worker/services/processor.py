@@ -61,6 +61,7 @@ class Processor:
                 "whatsapp": client.get('whatsapp'),
                 "participa_pre_cobranca": client.get('participa_pre_cobranca'),
                 "ativo": client.get('ativo'),
+                "tipo_pessoa": client.get('tipo_pessoa') or client.get('pessoa'),
                 "data_ultima_alteracao": datetime.now()
             })
         return processed
@@ -148,6 +149,8 @@ class Processor:
             if not client:
                 continue
 
+            logger.info(client)
+
             # Additional keys from client
             merged_bill = bill.copy()
             merged_bill.update({
@@ -161,7 +164,8 @@ class Processor:
                 "cnpj_cpf": client.get('cnpj_cpf', ''),
                 "id_condominio": client.get('id_condominio', ''),
                 "ativo": client.get('ativo', ''),
-                "participa_pre_cobranca": client.get('participa_pre_cobranca', '')
+                "participa_pre_cobranca": client.get('participa_pre_cobranca', ''),
+                "tipo_pessoa": client.get('tipo_pessoa') or client.get('pessoa') or '',
             })
             
             # Unique ID
