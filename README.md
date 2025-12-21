@@ -4,9 +4,10 @@ A Python application that replicates the logic of the "Debt Collector" Node-RED 
 
 ## Structure
 
-- `main.py`: Entry point. Orchestrates the scheduler (Clients, Bills, Dialer jobs).
+- `collector_worker/main.py`: Entry point. Orchestrates the scheduler (Clients, Bills, Reports, Dialer jobs).
 - `services/ixc_client.py`: Handles IXC API communication (Auth, Pagination, Rate Limiting).
 - `services/processor.py`: Business logic for data normalization, due date calculation, and correlating Bills with Clients.
+- `services/report_service.py`: Fetches CDR reports and detailed events from Asterisk/Issabel and stores them in MongoDB.
 - `services/dialer.py`: Manages call windows (business hours), builds call queues based on rules, and triggers calls via Asterisk ARI.
 - `database.py`: MongoDB connection and repository functions.
 - `config.py`: Environment configuration.
@@ -28,7 +29,19 @@ A Python application that replicates the logic of the "Debt Collector" Node-RED 
 
 3. **Run**:
    ```bash
-   python3 main.py
+   python3 collector_worker/main.py
+   ```
+   
+   **CLI Arguments**:
+   You can run specific jobs manually for debugging or one-off execution:
+   ```bash
+   # Run only the Reports job
+   python3 collector_worker/main.py --job reports --debug
+
+   # Run only the Dialer job
+   python3 collector_worker/main.py --job dialer
+
+   # Available jobs: clients, bills, dialer, reports, service (default)
    ```
 
 ## Docker
@@ -50,3 +63,4 @@ A Python application that replicates the logic of the "Debt Collector" Node-RED 
 - **Resilient Scheduler**: Uses `schedule` library to run tasks at specific times or intervals.
 - **Rate Limiting**: Respects IXC API limits (100ms delay).
 - **Graceful Error Handling**: Logs errors without crashing the main loop.
+- **CDR Reports**: Automatically fetches call detail records and event logs from Asterisk, respecting dialer time windows.
