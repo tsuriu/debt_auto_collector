@@ -7,11 +7,6 @@ from loguru import logger
 from database import Database
 
 class ReportService:
-    # Default config from try.py if not present in instance
-    DEFAULT_URL = "http://170.84.156.18:8080"
-    DEFAULT_USER = "admin"
-    DEFAULT_PASS = "e45b6e3959"
-
     CDR_FIELDS = [
         "calldate", "src", "dst", "dcontext", "channel", 
         "dstchannel", "lastapp", "disposition", "duration", "uniqueid"
@@ -24,11 +19,17 @@ class ReportService:
 
     def __init__(self, instance):
         self.instance = instance
-        # Prefer instance config, fallback to defaults
         asterisk_config = instance.get('asterisk', {})
-        self.base_url = asterisk_config.get('url', self.DEFAULT_URL).rstrip('/')
-        self.username = asterisk_config.get('user', self.DEFAULT_USER)
-        self.password = asterisk_config.get('pass', self.DEFAULT_PASS)
+        
+        host = asterisk_config.get('cdr_host')
+        port = asterisk_config.get('cdr_port', '80')
+        self.username = asterisk_config.get('cdr_username')
+        self.password = asterisk_config.get('cdr_password')
+        
+        if not all([host, self.username, self.password]):
+            logger.warning(f"Missing CDR configuration for instance {instance.get('instance_name')}. Check cdr_host, cdr_username, cdr_password.")
+            
+        self.base_url = f"http://{host}:{port}".rstrip('/')
         
         # Determine channel pattern (field_pattern)
         # Requirement: "field_pattern is in instannce_document.asterisk.channel"
@@ -212,7 +213,11 @@ class ReportService:
             }
             
             db.last_reports.insert_one(report_doc)
+            db.last_reports.insert_one(report_doc)
             logger.info("Saved report to 'last_reports' collection")
+            
+            return len(cdrs)
 
         except Exception as e:
             logger.error(f"Report Service process failed: {e}")
+            return 0

@@ -276,6 +276,17 @@ def run_dialer_job():
                     time.sleep(1)
             
             logger.info(f"Triggered {count} calls for {instance.get('instance_name')}")
+            
+            # Log Stats
+            db.history_action_log.insert_one({
+                "instance_full_id": instance_full_id,
+                "action": "job_dialer_stats",
+                "occurred_at": datetime.now(),
+                "details": {
+                    "queue_size": len(queue),
+                    "triggered": count
+                }
+            })
 
         except Exception as e:
             logger.error(f"Error in Dialer Job for {instance.get('instance_name')}: {e}")
@@ -286,9 +297,27 @@ def run_reports_update_job():
     
     for instance in instances:
         try:
+            instance_full_id = _get_instance_full_id(instance)
             logger.info(f"Processing reports for instance: {instance.get('instance_name')}")
+            
+            # Inject debug config if global debug is on
+            if Config.DEBUG:
+                instance['debug_calls'] = True
+            
             service = ReportService(instance)
-            service.process()
+            service = ReportService(instance)
+            count = service.process() or 0
+            
+            # Log Stats
+            Database().get_db().history_action_log.insert_one({
+                "instance_full_id": instance_full_id,
+                "action": "job_reports_stats",
+                "occurred_at": datetime.now(),
+                "details": {
+                    "fetched": count
+                }
+            })
+            
             logger.info(f"Report job finished for {instance.get('instance_name')}")
         except Exception as e:
             logger.error(f"Error in Report Job for {instance.get('instance_name')}: {e}")
