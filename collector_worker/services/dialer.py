@@ -113,6 +113,7 @@ class Dialer:
         
         for cid, client_bills in client_map.items():
             sample = client_bills[0]
+            expired_age = sample.get('expired_age', 0)
             total_value = sum(float(b.get('valor', 0)) for b in client_bills)
             client_name = sample.get('razao') or sample.get('fantasia')
             bill_ids = [b.get('full_id') for b in client_bills if b.get('full_id')]
@@ -137,6 +138,7 @@ class Dialer:
                 if self.can_call_number(number):
                     call_queue.append({
                         "client_id": cid,
+                        "expired_age": expired_age,
                         "contact": number,
                         "client_name": client_name,
                         "total_value": total_value,

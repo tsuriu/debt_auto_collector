@@ -245,12 +245,15 @@ def run_dialer_job():
             
             # Get limit from finding settings or default to 10
             limit = instance.get('asterisk', {}).get('num_channel_available', 10)
-            
+
+            sorted_queue = sorted(
+                queue,
+                key=lambda x: x.get("expired_age", 0),
+                reverse=True
+            )
+
             count = 0
-            for call in queue:
-                if count >= limit:
-                    break
-                
+            for call in sorted_queue[:limit]:
                 # Check 4h window again (just in case multiple numbers for same client in queue)
                 # Although queue builder handles it, `dialer.trigger_call` updates the map.
                 # But `dialer.trigger_call` doesn't check `can_call_number`, it just dials.
