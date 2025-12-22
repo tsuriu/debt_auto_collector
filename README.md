@@ -42,6 +42,9 @@ A Python application that replicates the logic of the "Debt Collector" Node-RED 
    python3 collector_worker/main.py --job dialer
 
    # Available jobs: clients, bills, dialer, reports, service (default)
+
+   # Run Database Verification (Connection & Indices)
+   python3 collector_worker/main.py --verify-db
    ```
 
 ## Docker
@@ -61,6 +64,7 @@ A Python application that replicates the logic of the "Debt Collector" Node-RED 
 
 - **Multi-Instance Support**: Iterates over all active instances found in the database.
 - **Resilient Scheduler**: Uses `schedule` library to run tasks at specific times or intervals.
+- **Strict Data Integrity**: Enforces unique constraints and performance indices on MongoDB.
 - **Rate Limiting**: Respects IXC API limits (100ms delay).
 - **Graceful Error Handling**: Logs errors without crashing the main loop.
 - **CDR Reports**: Automatically fetches call detail records and event logs from Asterisk, respecting dialer time windows.

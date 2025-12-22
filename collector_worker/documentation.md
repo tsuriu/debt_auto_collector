@@ -23,7 +23,8 @@ collector_worker/
 │   ├── processor.py        # Data processing and business logic
 │   ├── dialer.py           # Dialer logic (Queue building & ARI trigger)
 │   └── report_service.py   # Fetches CDRs from Asterisk
-└── utils/                  # Utility helpers (currently empty)
+└── utils/                  
+    └── time_utils.py       # Shared operational window logic
 ```
 
 ## Configuration
@@ -112,6 +113,20 @@ The Service runs on a schedule defined in `main.py`.
 *   **Key Methods**:
     *   `fetch_cdr_list()`: Gets daily call list.
     *   `fetch_events()`: Gets drill-down details for a call.
+
+### `utils/time_utils.py`
+*   **Purpose**: Centralized operational window logic.
+*   **Key Methods**:
+    *   `is_within_operational_window(debug_mode)`: Returns True if current time is allowed for dialing/reporting.
+
+## Maintenance
+
+### Database Verification
+To ensure the database is healthy and has all required indices (especially the critical Dialer compound index), run:
+```bash
+python main.py --verify-db
+```
+This checks connectivity, lists collections, and verifies index existence.
 
 ## Deployment
 

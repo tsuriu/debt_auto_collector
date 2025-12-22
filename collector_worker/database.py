@@ -33,10 +33,47 @@ class Database:
             self.db.history_action_log.create_index([("occurred_at", -1)])
             self.db.history_action_log.create_index("instance_full_id")
             
+            # Compound Index for Dialer Performance
+            self.db.history_action_log.create_index([
+                ("instance_full_id", 1), 
+                ("action", 1), 
+                ("details.number", 1), 
+                ("occurred_at", -1)
+            ])
+            
             logger.info("Database indices ensured.")
         except Exception as e:
             logger.error(f"Error creating indices: {e}")
 
+
+    def verify_structure(self):
+        """
+        Verifies database connectivity and indices.
+        Returns a dict with status details.
+        """
+        report = {"status": "ok", "details": {}}
+        try:
+            # 1. Ping
+            self.db.command('ping')
+            report["details"]["connection"] = "Connected"
+            
+            # 2. Check Collections
+            collections = self.get_collections()
+            report["details"]["collections"] = collections
+            
+            # 3. Check Critical Indices
+            # Just listing them for now
+            report["details"]["indices"] = {}
+            for col_name in ["clients", "bills", "history_action_log"]:
+                 if col_name in collections:
+                     idxs = list(self.db[col_name].list_indexes())
+                     report["details"]["indices"][col_name] = [i['name'] for i in idxs]
+            
+        except Exception as e:
+            report["status"] = "error"
+            report["error"] = str(e)
+            
+        return report
 
 def get_active_instances():
     db = Database().get_db()

@@ -5,6 +5,7 @@ import html
 from datetime import datetime
 from loguru import logger
 from database import Database
+from utils.time_utils import is_within_operational_window
 
 class ReportService:
     CDR_FIELDS = [
@@ -152,29 +153,8 @@ class ReportService:
 
     def check_window(self):
         """Returns True if current time is within allowed call window (same as Dialer)"""
-        now = datetime.now()
-        hour = now.hour
-        day = now.weekday() # 0=Mon, 6=Sun
-        
         # Check instance debug flag (mirrored from Dialer logic, though 'debug_calls' is specific)
-        if self.instance.get('debug_calls', False):
-            return True
-
-        if day == 6: # Sunday
-            return False
-            
-        if day == 5: # Saturday
-            # 8h to 13h
-            if 8 <= hour < 13:
-                return True
-            return False
-            
-        # Weekdays
-        # 8h to 19h
-        if 8 <= hour < 19:
-            return True
-            
-        return False
+        return is_within_operational_window(self.instance.get('debug_calls', False))
 
     def process(self):
         """

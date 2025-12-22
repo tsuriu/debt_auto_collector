@@ -91,7 +91,7 @@ def run_clients_update_job():
                     })
                 
                 # Update Metadata
-                db.data_refeence.update_one(
+                db.data_reference.update_one(
                     {"instance_full_id": instance_full_id},
                     {"$set": {
                         "instance_full_id": instance_full_id,
@@ -192,7 +192,7 @@ def run_bills_update_job():
                 }
             })
 
-            db.data_refeence.update_one(
+            db.data_reference.update_one(
                 {"instance_full_id": instance_full_id},
                 {"$set": {
                     "instance_full_id": instance_full_id,
@@ -373,6 +373,11 @@ def main():
         action="store_true",
         help="Enable debug logging and behavior"
     )
+    parser.add_argument(
+        "--verify-db", 
+        action="store_true",
+        help="Run database verification and exit"
+    )
     args = parser.parse_args()
 
     # Configure Loguru
@@ -400,6 +405,14 @@ def main():
 
     if args.job == "reports":
         run_reports_update_job()
+        return
+
+    if args.verify_db:
+        logger.info("Running Database Verification...")
+        # Ensure indices exist so we are verifying the TARGET state
+        Database().ensure_indices()
+        report = Database().verify_structure()
+        logger.info(f"Verification Result: {report}")
         return
 
     # Service / Scheduler Mode
