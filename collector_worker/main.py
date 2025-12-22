@@ -243,9 +243,12 @@ def run_dialer_job():
             
             logger.info(f"Queue for {instance.get('instance_name')}: {len(queue)} calls")
             
+            # Get limit from finding settings or default to 10
+            limit = instance.get('asterisk', {}).get('num_channel_available', 10)
+            
             count = 0
             for call in queue:
-                if count >= 10:
+                if count >= limit:
                     break
                 
                 # Check 4h window again (just in case multiple numbers for same client in queue)
