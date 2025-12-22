@@ -408,7 +408,7 @@ def main():
         
         # Schedule definitions
         schedule.every().day.at("07:00").do(run_clients_update_job)
-        schedule.every(1).hours.do(run_bills_update_job)
+        # schedule.every(1).hours.do(run_bills_update_job) #Duplicated line
         schedule.every(1).hours.do(run_bills_update_job)
         # Reports are now triggered 5min after dialer job ends
         # schedule.every(5).minutes.do(run_reports_update_job)
