@@ -67,7 +67,9 @@ The Service runs on a schedule defined in `main.py`.
     *   Filters by `minimum_days_to_charge` (default 7 days).
     *   Groups by Client.
     *   Sanitizes phone numbers.
-    *   **Rate Limit**: Checks if number was called in the last 4 hours.
+    *   **Rate Limit**: Enforces strict rules using MongoDB history:
+        *   **Max 3 calls per day** per number.
+        *   **Min 4 hours interval** between calls.
     *   **Channel Limit**: Limits total calls per run based on `asterisk.num_channel_available` (default 10).
 3.  **Trigger Calls**:
     *   Integrates with Asterisk ARI to initiate calls.

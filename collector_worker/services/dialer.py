@@ -3,6 +3,7 @@ import base64
 from loguru import logger
 from datetime import datetime, timedelta
 import re
+from database import Database
 
 class Dialer:
     def __init__(self, instance_config):
@@ -10,11 +11,13 @@ class Dialer:
         self.pabx = instance_config.get('asterisk', {})
         self.min_days = instance_config.get('charger', {}).get('minimum_days_to_charge', 7)
         
-        # In-memory state (should be persisted in production but keeping simpler for now as per plan)
-        # Ideally this should be in Redis or Mongo to survive restarts
-        self.number_last_called = {} 
-        self.client_attempts = {} 
-        self.retry_queue = []
+        # Construct instance_full_id for DB queries
+        name = instance_config.get('instance_name', 'default')
+        erp_type = instance_config.get('erp', {}).get('type', 'ixc')
+        oid = str(instance_config.get('_id', ''))
+        self.instance_full_id = f"{name}-{erp_type}-{oid}"
+        
+        self.db = Database().get_db()
 
     def check_window(self):
         """Returns True if current time is within allowed call window"""
@@ -42,13 +45,52 @@ class Dialer:
         return False
 
     def can_call_number(self, number):
-        last_time = self.number_last_called.get(number)
-        if not last_time:
-            return True
+        """
+        Enforce rules:
+        1. Max 3 calls per day
+        2. Min 4 hours interval between calls
+        """
+        today_start = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
         
-        # 4 hours block
-        cutoff = datetime.now() - timedelta(hours=4)
-        return last_time < cutoff
+        # Filter for this number, this instance, and dialer actions
+        query = {
+            "instance_full_id": self.instance_full_id,
+            "action": "dialer_trigger",
+            "details.number": number,
+            "occurred_at": {"$gte": today_start}
+        }
+        
+        # 1. Check Max Calls per Day (3)
+        count_today = self.db.history_action_log.count_documents(query)
+        if count_today >= 3:
+            logger.debug(f"Blocked {number}: Max 3 calls reached for today.")
+            return False
+            
+        # 2. Check Interval (4h)
+        # Get the most recent call (not just today, but generally? 
+        # User constraint: 'at last 4 hours of interval'. 
+        # Usually implies 4h from ANY last call.
+        # But if we only check today, the first call of day might be < 4h from yesterday's last call.
+        # Strict interpretation: check global last call.
+        
+        last_call = self.db.history_action_log.find_one(
+            {
+                "instance_full_id": self.instance_full_id,
+                "action": "dialer_trigger",
+                "details.number": number
+            },
+            sort=[("occurred_at", -1)]
+        )
+        
+        if last_call:
+            last_time = last_call.get('occurred_at')
+            if last_time:
+                diff = datetime.now() - last_time
+                if diff < timedelta(hours=4):
+                    logger.debug(f"Blocked {number}: Last call was {diff} ago (<4h).")
+                    return False
+        
+        return True
 
     def build_queue(self, bills):
         if not self.check_window():
@@ -160,8 +202,8 @@ class Dialer:
             resp.raise_for_status()
             logger.info(f"Call triggered successfully. Status: {resp.status_code}")
             
-            # Record last call time
-            self.number_last_called[number] = datetime.now()
+            # Record last call time -> Handled by main.py logging to history_action_log
+            # self.number_last_called[number] = datetime.now() 
             return True
             
         except Exception as e:
