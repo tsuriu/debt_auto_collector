@@ -313,6 +313,14 @@ def run_dialer_job():
         except Exception as e:
             logger.error(f"Error in Dialer Job for {instance.get('instance_name')}: {e}")
 
+    # Schedule deferred report execution (5 minutes after dialer finishes)
+    def _run_report_once():
+        run_reports_update_job()
+        return schedule.CancelJob
+        
+    schedule.every(5).minutes.do(_run_report_once)
+    logger.info("Scheduled Reports Job to run in 5 minutes.")
+
 def run_reports_update_job():
     logger.info("Starting Job: REPORTS UPDATE")
     instances = get_active_instances()
@@ -395,7 +403,9 @@ def main():
         # Schedule definitions
         schedule.every().day.at("07:00").do(run_clients_update_job)
         schedule.every(1).hours.do(run_bills_update_job)
-        schedule.every(5).minutes.do(run_reports_update_job)
+        schedule.every(1).hours.do(run_bills_update_job)
+        # Reports are now triggered 5min after dialer job ends
+        # schedule.every(5).minutes.do(run_reports_update_job)
         
         # Dialer: every 20 minutes between 8-18 (handled by check_window inside job)
         schedule.every(20).minutes.do(run_dialer_job)
