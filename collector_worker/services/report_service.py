@@ -213,7 +213,6 @@ class ReportService:
             }
             
             db.last_reports.insert_one(report_doc)
-            db.last_reports.insert_one(report_doc)
             logger.info("Saved report to 'last_reports' collection")
             
             return len(cdrs)

@@ -66,6 +66,7 @@ The Service runs on a schedule defined in `main.py`.
     *   Finds expired bills (`vencimento_status='expired'`) for the instance.
     *   Filters by `minimum_days_to_charge` (default 7 days).
     *   Groups by Client.
+    *   **Priority**: Sorts calls by `expired_age` descending (oldest debt first).
     *   Sanitizes phone numbers.
     *   **Rate Limit**: Enforces strict rules using MongoDB history:
         *   **Max 3 calls per day** per number.
