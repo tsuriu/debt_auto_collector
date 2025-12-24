@@ -8,8 +8,9 @@ A Python application that replicates the logic of the "Debt Collector" Node-RED 
 - `services/ixc_client.py`: Handles IXC API communication (Auth, Pagination, Rate Limiting).
 - `services/processor.py`: Business logic for data normalization, due date calculation, and correlating Bills with Clients.
 - `services/report_service.py`: Fetches CDR reports and detailed events from Asterisk/Issabel and stores them in MongoDB.
-- `services/dialer.py`: Manages call windows (business hours), builds call queues based on rules, and triggers calls via Asterisk ARI.
-- `database.py`: MongoDB connection and repository functions.
+- `services/dialer.py`: Manages call windows, builds queues, and triggers calls.
+- `services/verification.py`: Handles database structure verification and Loguru reporting.
+- `database.py`: MongoDB connection and schema definitions.
 - `config.py`: Environment configuration.
 
 ## Setup
@@ -67,4 +68,6 @@ A Python application that replicates the logic of the "Debt Collector" Node-RED 
 - **Strict Data Integrity**: Enforces unique constraints and performance indices on MongoDB.
 - **Rate Limiting**: Respects IXC API limits (100ms delay).
 - **Graceful Error Handling**: Logs errors without crashing the main loop.
-- **CDR Reports**: Automatically fetches call detail records and event logs from Asterisk, respecting dialer time windows.
+- **CDR Reports**: Automatically fetches call detail records and event logs from Asterisk.
+- **Structured Logging**: Uses `loguru` for beautiful and configurable service logs.
+- **Self-Healing DB**: Automatically verifies and fixes database indices and collections on startup.

@@ -1,6 +1,9 @@
 from pymongo import MongoClient
 from config import Config
 from loguru import logger
+import json
+import os
+from bson import ObjectId
 
 class Database:
     _instance = None
@@ -45,6 +48,64 @@ class Database:
         except Exception as e:
             logger.error(f"Error creating indices: {e}")
 
+    def ensure_collections(self):
+        """
+        Check for required collections. Note: MongoDB creates lazily.
+        But we specifically need 'instance_config' to prompt the app to run.
+        """
+        report = {"created": [], "existing": []}
+        try:
+            required = ["clients", "bills", "history_action_log", "last_reports", "data_reference", "instance_config"]
+            existing = self.get_collections()
+            
+            for r in required:
+                if r not in existing:
+                    logger.info(f"Collection '{r}' missing. Creating explicitly.")
+                    self.db.create_collection(r)
+                    report["created"].append(r)
+                else:
+                    report["existing"].append(r)
+            
+            # Auto-Seed instance_config if missing or empty
+            # Re-check existing because we might have just created it
+            if "instance_config" not in existing or self.db.instance_config.count_documents({}) == 0:
+                self.seed_instance_config()
+                
+            return report
+        except Exception as e:
+            logger.error(f"Error ensuring collections: {e}")
+            raise
+
+    def seed_instance_config(self):
+        """
+        Looks for instance_data_sample.json in root or ../ and seeds it.
+        """
+        try:
+            # Possible locations
+            paths = ["instance_data_sample.json", "../instance_data_sample.json", "/app/instance_data_sample.json"]
+            
+            data = None
+            for p in paths:
+                if os.path.exists(p):
+                    with open(p, 'r') as f:
+                        data = json.load(f)
+                    break
+            
+            if data:
+                # Handle extended JSON (e.g. {"$oid": ...})
+                if "_id" in data and "$oid" in data["_id"]:
+                    data["_id"] = ObjectId(data["_id"]["$oid"])
+                
+                # Check duplication
+                if not self.db.instance_config.find_one({"_id": data["_id"]}):
+                    self.db.instance_config.insert_one(data)
+                    logger.info(f"Seeded 'instance_config' from {p}")
+            else:
+                logger.warning("No seed file (instance_data_sample.json) found. 'instance_config' is empty.")
+                
+        except Exception as e:
+            logger.error(f"Failed to seed instance_config: {e}")
+
 
     def verify_structure(self):
         """
@@ -58,16 +119,17 @@ class Database:
             report["details"]["connection"] = "Connected"
             
             # 2. Check Collections
-            collections = self.get_collections()
-            report["details"]["collections"] = collections
+            coll_report = self.ensure_collections() 
+            report["details"]["collections"] = coll_report
             
             # 3. Check Critical Indices
-            # Just listing them for now
+            self.ensure_indices() 
+            
+            # Detailed Indices Report
             report["details"]["indices"] = {}
-            for col_name in ["clients", "bills", "history_action_log"]:
-                 if col_name in collections:
-                     idxs = list(self.db[col_name].list_indexes())
-                     report["details"]["indices"][col_name] = [i['name'] for i in idxs]
+            for col_name in coll_report["existing"] + coll_report["created"]:
+                 idxs = list(self.db[col_name].list_indexes())
+                 report["details"]["indices"][col_name] = [i['name'] for i in idxs]
             
         except Exception as e:
             report["status"] = "error"

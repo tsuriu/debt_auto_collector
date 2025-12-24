@@ -5,42 +5,35 @@ services:
       dockerfile: collector_worker/Dockerfile
     container_name: collector_worker
     restart: unless-stopped
-    depends_on:
-      - mongo
+    networks:
+      - debt_collector_net
     environment:
-      # - MONGO_URI=mongodb://mongo:27017/debt_collector
-      - MONGO_URI=mongodb://root:rootpassword@192.168.107.4:27017/?authSource=admin
+      - MONGO_URI=mongodb://root:rootpassword@mongo:27017/debt_collector?authSource=admin
       - TZ=America/Maceio
       - DEBUG=false
     volumes:
       - ./collector_worker:/app
-    command: python main.py --job service
+    command: python main.py --job service --debug
+    depends_on:
+      - mongo
 
   mongo:
     image: mongo:latest
     container_name: debt_collector_mongo
     restart: unless-stopped
     ports:
-      - "27017:27017"
+      - "27018:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: rootpassword
     volumes:
       - mongo_data:/data/db
-
-  call_monitor_agent:
-    build:
-      context: .
-      dockerfile: call_monitor_agent/Dockerfile
-    container_name: call_monitor_agent
-    restart: unless-stopped
-    depends_on:
-      - mongo
-    environment:
-      - MONGO_URI=mongodb://root:rootpassword@192.168.107.4:27017/?authSource=admin
-      - TZ=America/Maceio
-      - DEBUG=false
-    volumes:
-      - ./call_monitor_agent:/app
-    command: python main.py
-
+    networks:
+      - debt_collector_net
 
 volumes:
   mongo_data:
+
+networks:
+  debt_collector_net:
+    driver: bridge

@@ -1,4 +1,4 @@
-import time, sys
+import time, sys, json
 import schedule
 from datetime import datetime
 from loguru import logger
@@ -6,9 +6,9 @@ from config import Config
 from database import Database, get_active_instances
 from services.ixc_client import IxcClient
 from services.processor import Processor
-from services.processor import Processor
 from services.dialer import Dialer
 from services.report_service import ReportService
+from services.verification import VerificationService
 
 def _get_instance_full_id(instance):
     name = instance.get('instance_name', 'default')
@@ -341,7 +341,6 @@ def run_reports_update_job():
                 instance['debug_calls'] = True
             
             service = ReportService(instance)
-            service = ReportService(instance)
             count = service.process() or 0
             
             # Log Stats
@@ -391,6 +390,16 @@ def main():
 
     logger.info(f"Starting application in mode: {args.job.upper()}")
 
+    # Ensure DB Structure (Collections & Indices) ALWAYS on startup
+    # This prevents running jobs against a broken or empty DB
+    if not args.verify_db: 
+        logger.info("Initializing database...")
+        verifier = VerificationService()
+        if verifier.run_full_verification(exit_on_failure=not Config.DEBUG):
+            logger.info("Database structure confirmed.")
+        else:
+            logger.error("Database initialization failed.")
+
     if args.job == "clients":
         run_clients_update_job()
         return
@@ -409,10 +418,8 @@ def main():
 
     if args.verify_db:
         logger.info("Running Database Verification...")
-        # Ensure indices exist so we are verifying the TARGET state
-        Database().ensure_indices()
-        report = Database().verify_structure()
-        logger.info(f"Verification Result: {report}")
+        verifier = VerificationService()
+        verifier.run_full_verification(exit_on_failure=True)
         return
 
     # Service / Scheduler Mode
@@ -421,7 +428,6 @@ def main():
         
         # Schedule definitions
         schedule.every().day.at("07:00").do(run_clients_update_job)
-        # schedule.every(1).hours.do(run_bills_update_job) #Duplicated line
         schedule.every(1).hours.do(run_bills_update_job)
         # Reports are now triggered 5min after dialer job ends
         # schedule.every(5).minutes.do(run_reports_update_job)
@@ -433,19 +439,12 @@ def main():
         if args.debug or Config.DEBUG:
             logger.warning("DEBUG MODE: Running all jobs immediately for verification")
             try:
-                # Connectivity check
-                db = Database().get_db()
-                db.command("ping")
-                db.command("ping")
-                logger.debug("MongoDB connection successful")
-                Database().ensure_indices()
-                
                 run_clients_update_job()
                 run_bills_update_job()
                 run_reports_update_job()
                 run_dialer_job()
             except Exception as e:
-                logger.critical(f"Startup verification failed (likely Database error): {e}")
+                logger.critical(f"Startup jobs failed: {e}")
                 sys.exit(1)
         
         while True:

@@ -2,7 +2,7 @@
 
 ## Overview
 
-The `collector_worker` is a Python-based service designed to automate debt collection processes. It integrates with an external ERP (IXC) and a PABX system (Asterisk/Issabel) to manage clients, bills, automatic dialing, and call reporting.
+The `collector_worker` is a Python-based service designed to automate debt collection processes. It integrates with an external ERP (IXC) and a PABX system (Asterisk/Issabel) to manage clients, bills, automatic dialing, and call reporting. All logging is handled via `loguru`.
 
 ## Architecture
 
@@ -22,7 +22,8 @@ collector_worker/
 │   ├── ixc_client.py       # API Client for IXC ERP
 │   ├── processor.py        # Data processing and business logic
 │   ├── dialer.py           # Dialer logic (Queue building & ARI trigger)
-│   └── report_service.py   # Fetches CDRs from Asterisk
+│   ├── report_service.py   # Fetches CDRs from Asterisk
+│   └── verification.py     # Database structure verification service
 └── utils/                  
     └── time_utils.py       # Shared operational window logic
 ```
@@ -113,6 +114,11 @@ The Service runs on a schedule defined in `main.py`.
 *   **Key Methods**:
     *   `fetch_cdr_list()`: Gets daily call list.
     *   `fetch_events()`: Gets drill-down details for a call.
+    
+### `verification.py`
+*   **Purpose**: Ensures database health and structural integrity.
+*   **Key Methods**:
+    *   `run_full_verification()`: Executes connection check, ensures collections, and creates indices.
 
 ### `utils/time_utils.py`
 *   **Purpose**: Centralized operational window logic.
@@ -126,7 +132,11 @@ To ensure the database is healthy and has all required indices (especially the c
 ```bash
 python main.py --verify-db
 ```
-This checks connectivity, lists collections, and verifies index existence.
+Or use the standalone script:
+```bash
+python verify_db_script.py
+```
+This service uses the `VerificationService` to check connectivity, ensure collections, and verify index existence with detailed `loguru` feedback.
 
 ## Deployment
 
