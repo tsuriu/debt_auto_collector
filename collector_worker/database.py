@@ -77,25 +77,81 @@ class Database:
             raise
 
     def seed_instance_config(self):
-        """Seeds instance_config from JSON file if missing."""
+        """Seeds instance_config from JSON file OR hardcoded fallback if missing."""
         try:
+            # 1. Try to find the file
             paths = ["instance_data_sample.json", "../instance_data_sample.json", "/app/instance_data_sample.json"]
             data = None
             for p in paths:
                 if os.path.exists(p):
                     with open(p, 'r') as f:
                         data = json.load(f)
+                        logger.info(f"Loading seed data from {p}")
                     break
             
+            # 2. Fallback to hardcoded sample if file not found
+            if not data:
+                logger.warning("No seed file found. Using hardcoded fallback sample.")
+                data = {
+                    "_id": {"$oid": "69263d581bdf47cf8b276136"},
+                    "instance_name": "sample",
+                    "erp": {
+                        "type": "ixc",
+                        "base_url": "https://ixc.sample.com.br/webservice/v1",
+                        "auth": {"user_id": "", "user_token": "sample_token"},
+                        "filial_id": [1],
+                        "request_param": {
+                            "default_page_size": 600,
+                            "max_records": 50000,
+                            "delay_between_pages": 150,
+                            "safety_limit": 1000
+                        }
+                    },
+                    "charger": {
+                        "minimum_days_to_charge": 7,
+                        "max_days_to_search": 30,
+                        "dial_interval": 4,
+                        "dial_per_day": 3
+                    },
+                    "asterisk": {
+                        "host": "0.0.0.0",
+                        "port": "8088",
+                        "username": "admin",
+                        "password": "admin",
+                        "context": "auto-charger-context",
+                        "extension": "start",
+                        "channel_type": "SIP",
+                        "channel": "biller-trunk",
+                        "num_channel_available": 10,
+                        "cdr_host": "0.0.0.0",
+                        "cdr_port": "8080",
+                        "cdr_username": "admin",
+                        "cdr_password": "admin"
+                    },
+                    "status": {
+                        "active": false,
+                        "last_sync": "2025-11-25T22:10:00-03:00",
+                        "last_error": None,
+                        "health": "ok"
+                    },
+                    "metadata": {
+                        "created_at": "2025-11-25T21:00:00-03:00",
+                        "updated_at": "2025-11-25T22:10:00-03:00",
+                        "description": "Instância do cliente X"
+                    }
+                }
+
+            # 3. Insert into DB
             if data:
-                if "_id" in data and "$oid" in data["_id"]:
+                # Convert $oid if present (found in file-based JSON)
+                if "_id" in data and isinstance(data["_id"], dict) and "$oid" in data["_id"]:
                     data["_id"] = ObjectId(data["_id"]["$oid"])
                 
+                # Check duplication before insert
                 if not self.db.instance_config.find_one({"_id": data["_id"]}):
                     self.db.instance_config.insert_one(data)
-                    logger.info(f"Seeded 'instance_config' from {p}")
-            else:
-                logger.warning("No seed file found for 'instance_config'.")
+                    logger.info("Successfully seeded 'instance_config' collection.")
+                    
         except Exception as e:
             logger.error(f"Seeding failed: {e}")
 
