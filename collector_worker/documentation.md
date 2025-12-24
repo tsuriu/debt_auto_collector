@@ -114,11 +114,19 @@ The Service runs on a schedule defined in `main.py`.
 *   **Key Methods**:
     *   `fetch_cdr_list()`: Gets daily call list.
     *   `fetch_events()`: Gets drill-down details for a call.
+
+### `database.py`
+*   **Purpose**: Low-level database operations and schema management.
+*   **Key Methods**:
+    *   `ping()`: Connectivity check.
+    *   `ensure_collections()`: Creates missing collections lazily/explicitly.
+    *   `ensure_indices()`: Enforces required performance and unique indices.
+    *   `get_indices(collection)`: Introspection of current database state.
     
 ### `verification.py`
-*   **Purpose**: Ensures database health and structural integrity.
+*   **Purpose**: Orchestrates database health checks and provides specialized reporting.
 *   **Key Methods**:
-    *   `run_full_verification()`: Executes connection check, ensures collections, and creates indices.
+    *   `run_full_verification()`: High-level workflow that uses `Database` methods to confirm connectivity, collections, and indices before the app starts.
 
 ### `utils/time_utils.py`
 *   **Purpose**: Centralized operational window logic.
@@ -127,16 +135,18 @@ The Service runs on a schedule defined in `main.py`.
 
 ## Maintenance
 
-### Database Verification
-To ensure the database is healthy and has all required indices (especially the critical Dialer compound index), run:
+### Database Auto-Verification
+Database verification runs **automatically** on every startup. This process:
+1.  **Pings** MongoDB to ensure connectivity.
+2.  **Verifies/Creates** all required collections (`clients`, `bills`, etc.).
+3.  **Applies** all necessary indices for performance and uniqueness.
+4.  **Seeds** the `instance_config` collection if it's empty.
+
+To skip this check (e.g., in a stable environment for faster startup):
 ```bash
-python main.py --verify-db
+python main.py --no-verify-db
 ```
-Or use the standalone script:
-```bash
-python verify_db_script.py
-```
-This service uses the `VerificationService` to check connectivity, ensure collections, and verify index existence with detailed `loguru` feedback.
+This is orchestrated by the `VerificationService` using the low-level API provided by `database.py`. Detailed logs are provided via `loguru`.
 
 ## Deployment
 
@@ -149,8 +159,11 @@ Ensure `report_service` (or `collector_worker`) container has network access to 
 
 ### Manual Run
 ```bash
-# Run service daemon
+# Run service daemon (runs verification by default)
 python main.py --job service
+
+# Run without database verification
+python main.py --no-verify-db
 
 # Run one-off job (e.g., debug)
 python main.py --job dialer --debug

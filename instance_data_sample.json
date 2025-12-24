@@ -1,0 +1,56 @@
+{
+    "_id": {
+        "$oid": "69263d581bdf47cf8b276126"
+    },
+    "instance_name": "squid",
+    "erp": {
+        "type": "ixc",
+        "base_url": "https://ixc.squidtelecom.com.br/webservice/v1",
+        "auth": {
+            "user_id": "3",
+            "user_token": "e481aa8220cca2b6e35639f83fcc0354c28819b62fe5d8db450492aeb0e9cb4d"
+        },
+        "filial_id": [
+            2,
+            4
+        ],
+        "request_param": {
+            "default_page_size": 600,
+            "max_records": 50000,
+            "delay_between_pages": 150,
+            "safety_limit": 1000
+        }
+    },
+    "charger": {
+        "minimum_days_to_charge": 7,
+        "max_days_to_search": 30,
+        "dial_interval": 4,
+        "dial_per_day": 3
+    },
+    "asterisk": {
+        "host": "170.84.156.18",
+        "port": "8088",
+        "username": "admin2",
+        "password": "e45b6e3959",
+        "context": "sqd-auto-charger",
+        "extension": "start",
+        "channel_type": "SIP",
+        "channel": "sqd3718-trunk",
+        "num_channel_available": 10,
+        "cdr_host": "170.84.156.18",
+        "cdr_port": "8080",
+        "cdr_username": "admin",
+        "cdr_password": "e45b6e3959"
+    },
+    "status": {
+        "active": true,
+        "last_sync": "2025-11-25T22:10:00-03:00",
+        "last_error": null,
+        "health": "ok"
+    },
+    "metadata": {
+        "created_at": "2025-11-25T21:00:00-03:00",
+        "updated_at": "2025-11-25T22:10:00-03:00",
+        "description": "Instância do cliente X"
+    }
+}

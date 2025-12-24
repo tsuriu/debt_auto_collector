@@ -373,9 +373,9 @@ def main():
         help="Enable debug logging and behavior"
     )
     parser.add_argument(
-        "--verify-db", 
+        "--no-verify-db", 
         action="store_true",
-        help="Run database verification and exit"
+        help="Skip database verification on startup"
     )
     args = parser.parse_args()
 
@@ -392,13 +392,15 @@ def main():
 
     # Ensure DB Structure (Collections & Indices) ALWAYS on startup
     # This prevents running jobs against a broken or empty DB
-    if not args.verify_db: 
-        logger.info("Initializing database...")
+    if not args.no_verify_db: 
+        logger.info("Initializing database verification...")
         verifier = VerificationService()
         if verifier.run_full_verification(exit_on_failure=not Config.DEBUG):
             logger.info("Database structure confirmed.")
         else:
             logger.error("Database initialization failed.")
+            if not Config.DEBUG:
+                sys.exit(1)
 
     if args.job == "clients":
         run_clients_update_job()
@@ -416,11 +418,6 @@ def main():
         run_reports_update_job()
         return
 
-    if args.verify_db:
-        logger.info("Running Database Verification...")
-        verifier = VerificationService()
-        verifier.run_full_verification(exit_on_failure=True)
-        return
 
     # Service / Scheduler Mode
     if args.job == "service":

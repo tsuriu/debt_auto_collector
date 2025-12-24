@@ -9,9 +9,9 @@ A Python application that replicates the logic of the "Debt Collector" Node-RED 
 - `services/processor.py`: Business logic for data normalization, due date calculation, and correlating Bills with Clients.
 - `services/report_service.py`: Fetches CDR reports and detailed events from Asterisk/Issabel and stores them in MongoDB.
 - `services/dialer.py`: Manages call windows, builds queues, and triggers calls.
-- `services/verification.py`: Handles database structure verification and Loguru reporting.
-- `database.py`: MongoDB connection and schema definitions.
-- `config.py`: Environment configuration.
+- `services/verification.py`: High-level orchestration of DB health checks and Loguru reporting.
+- `database.py`: Low-level MongoDB connection, collection initialization, and index enforcement.
+- `config.py`: Environment configuration and shared settings.
 
 ## Setup
 
@@ -44,8 +44,8 @@ A Python application that replicates the logic of the "Debt Collector" Node-RED 
 
    # Available jobs: clients, bills, dialer, reports, service (default)
 
-   # Run Database Verification (Connection & Indices)
-   python3 collector_worker/main.py --verify-db
+   # Skip Database Verification
+   python3 collector_worker/main.py --no-verify-db
    ```
 
 ## Docker
