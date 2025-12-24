@@ -129,7 +129,7 @@ class Database:
                         "cdr_password": "admin"
                     },
                     "status": {
-                        "active": false,
+                        "active": False,
                         "last_sync": "2025-11-25T22:10:00-03:00",
                         "last_error": None,
                         "health": "ok"

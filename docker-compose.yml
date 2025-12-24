@@ -1,5 +1,5 @@
 services:
-  app:
+  collector_worker:
     build:
       context: .
       dockerfile: collector_worker/Dockerfile
@@ -8,7 +8,7 @@ services:
     networks:
       - debt_collector_net
     environment:
-      - MONGO_URI=mongodb://root:rootpassword@mongo:27018/debt_collector?authSource=admin
+      - MONGO_URI=mongodb://root:rootpassword@mongo:27017/debt_collector?authSource=admin
       - TZ=America/Maceio
       - DEBUG=false
     volumes:
