@@ -74,6 +74,17 @@ class Database:
 
             # Metrics
             self.db.metrics.create_index([("instance_full_id", 1), ("timestamp", -1)])
+
+            # TTL Indices
+            # history_action_log: 30 days (30 * 24 * 60 * 60 = 2592000 seconds)
+            self.db.history_action_log.create_index("occurred_at", expireAfterSeconds=2592000)
+            
+            # metrics: 90 days (90 * 24 * 60 * 60 = 7776000 seconds)
+            self.db.metrics.create_index("timestamp", expireAfterSeconds=7776000)
+            
+            # last_reports: 7 days (7 * 24 * 60 * 60 = 604800 seconds)
+            self.db.last_reports.create_index("last_run_timestamp", expireAfterSeconds=604800)
+            
             return True
         except Exception as e:
             logger.error(f"Error ensuring indices: {e}")

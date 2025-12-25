@@ -393,8 +393,17 @@ def main():
 
     # Configure Loguru
     logger.remove() # Remove default handler
-    log_level = "DEBUG" if (args.debug or Config.DEBUG) else "INFO"
-    logger.add(sys.stderr, level=log_level)
+    is_debug = args.debug or Config.DEBUG
+    log_level = "DEBUG" if is_debug else "INFO"
+    
+    # Production Format: Simple and concise
+    # Debug Format: Includes module, function, and line
+    if is_debug:
+        log_format = "<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> | <level>{level: <8}</level> | <cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - <level>{message}</level>"
+    else:
+        log_format = "[{time:YYYY-MM-DD HH:mm:ss}] <level>{level: <7}</level>: {message}"
+
+    logger.add(sys.stderr, level=log_level, format=log_format)
     
     if args.debug:
         Config.DEBUG = True
