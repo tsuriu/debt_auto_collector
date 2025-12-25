@@ -9,6 +9,7 @@ from services.processor import Processor
 from services.dialer import Dialer
 from services.report_service import ReportService
 from services.verification import VerificationService
+from services.metrics_service import MetricsService
 
 def _get_instance_full_id(instance):
     name = instance.get('instance_name', 'default')
@@ -357,13 +358,24 @@ def run_reports_update_job():
         except Exception as e:
             logger.error(f"Error in Report Job for {instance.get('instance_name')}: {e}")
 
+def run_metrics_job():
+    logger.info("Starting Job: METRICS")
+    instances = get_active_instances()
+    
+    for instance in instances:
+        try:
+            service = MetricsService(instance)
+            service.collect_metrics()
+        except Exception as e:
+            logger.error(f"Error in Metrics Job for {instance.get('instance_name')}: {e}")
+
 def main():
     import argparse
     
     parser = argparse.ArgumentParser(description="Debt Collector Service")
     parser.add_argument(
         "--job", 
-        choices=["clients", "bills", "dialer", "reports", "service"], 
+        choices=["clients", "bills", "dialer", "reports", "service", "metrics"], 
         default="service",
         help="Run a specific job manually (once) or start the long-running service (default)"
     )
@@ -418,6 +430,10 @@ def main():
         run_reports_update_job()
         return
 
+    if args.job == "metrics":
+        run_metrics_job()
+        return
+
 
     # Service / Scheduler Mode
     if args.job == "service":
@@ -429,6 +445,9 @@ def main():
         # Reports are now triggered 5min after dialer job ends
         # schedule.every(5).minutes.do(run_reports_update_job)
         
+        # Metrics: every 6 hours
+        schedule.every(30).minutes.do(run_metrics_job)
+
         # Dialer: every 20 minutes between 8-18 (handled by check_window inside job)
         schedule.every(20).minutes.do(run_dialer_job)
         

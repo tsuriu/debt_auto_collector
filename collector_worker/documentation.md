@@ -7,7 +7,7 @@ The `collector_worker` is a Python-based service designed to automate debt colle
 ## Architecture
 
 The system operates as a daemon or single-run job, connecting to:
-1.  **MongoDB**: For data storage (`clients`, `bills`, `history_action_log`, `last_reports`).
+1.  **MongoDB**: For data storage (`clients`, `bills`, `history_action_log`, `last_reports`, `metrics`).
 2.  **IXC ERP**: Fetches client and billing data via API.
 3.  **Asterisk/Issabel**: Triggers calls via ARI (Asterisk REST Interface) and fetches CDRs (Call Detail Records).
 
@@ -23,6 +23,7 @@ collector_worker/
 │   ├── processor.py        # Data processing and business logic
 │   ├── dialer.py           # Dialer logic (Queue building & ARI trigger)
 │   ├── report_service.py   # Fetches CDRs from Asterisk
+│   ├── metrics_service.py  # Calculates and stores data snapshots
 │   └── verification.py     # Database structure verification service
 └── utils/                  
     └── time_utils.py       # Shared operational window logic
@@ -85,6 +86,14 @@ The Service runs on a schedule defined in `main.py`.
 2.  **Fetch**: Retreives Call Detail Records (CDRs) for the current day.
 3.  **Enrich**: Fetches detailed events for each CDR (if available).
 4.  **Store**: Saves the raw report data to `last_reports` collection.
+    
+### 5. Metrics Collection (`run_metrics_job`)
+**Schedule**: Every 30 minutes
+1.  **Aggregate Clients**: Counts total clients, clients with open debt, and clients with expired open debt.
+2.  **Aggregate Bills**: Calculates total bills count, total expired bills count, `total_expired_debt_amount`, and `total_intime_debt_amount`.
+3.  **Action Logs**: Counts total dialer actions triggered for the current day.
+4.  **CDR Analytics**: Fetches the latest report from `last_reports` to compute disposition distribution and average call duration.
+5.  **Snapshot**: Saves all metrics into the `metrics` collection with a timestamp.
 
 ## Services Breakdown
 
@@ -114,6 +123,11 @@ The Service runs on a schedule defined in `main.py`.
 *   **Key Methods**:
     *   `fetch_cdr_list()`: Gets daily call list.
     *   `fetch_events()`: Gets drill-down details for a call.
+
+### `metrics_service.py`
+*   **Purpose**: Strategic data snapshots and performance analytics.
+*   **Key Methods**:
+    *   `collect_metrics()`: Orchestrates multiple database aggregations (clients, bills, history, reports) to create a historical data point.
 
 ### `database.py`
 *   **Purpose**: Low-level database operations and schema management.
@@ -167,4 +181,7 @@ python main.py --no-verify-db
 
 # Run one-off job (e.g., debug)
 python main.py --job dialer --debug
+
+# Run metrics collection manually
+python main.py --job metrics --debug
 ```

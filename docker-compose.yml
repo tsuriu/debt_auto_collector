@@ -13,7 +13,7 @@ services:
       - DEBUG=false
     volumes:
       - ./collector_worker:/app
-    command: python main.py --job service --debug
+    command: python main.py --job service
     depends_on:
       - mongo
 

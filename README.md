@@ -8,6 +8,7 @@ A Python application that replicates the logic of the "Debt Collector" Node-RED 
 - `services/ixc_client.py`: Handles IXC API communication (Auth, Pagination, Rate Limiting).
 - `services/processor.py`: Business logic for data normalization, due date calculation, and correlating Bills with Clients.
 - `services/report_service.py`: Fetches CDR reports and detailed events from Asterisk/Issabel and stores them in MongoDB.
+- `services/metrics_service.py`: Strategic data snapshots and performance analytics.
 - `services/dialer.py`: Manages call windows, builds queues, and triggers calls.
 - `services/verification.py`: High-level orchestration of DB health checks and Loguru reporting.
 - `database.py`: Low-level MongoDB connection, collection initialization, and index enforcement.
@@ -42,7 +43,7 @@ A Python application that replicates the logic of the "Debt Collector" Node-RED 
    # Run only the Dialer job
    python3 collector_worker/main.py --job dialer
 
-   # Available jobs: clients, bills, dialer, reports, service (default)
+   # Available jobs: clients, bills, dialer, reports, metrics, service (default)
 
    # Skip Database Verification
    python3 collector_worker/main.py --no-verify-db
@@ -71,3 +72,4 @@ A Python application that replicates the logic of the "Debt Collector" Node-RED 
 - **CDR Reports**: Automatically fetches call detail records and event logs from Asterisk.
 - **Structured Logging**: Uses `loguru` for beautiful and configurable service logs.
 - **Self-Healing DB**: Automatically verifies and fixes database indices and collections on startup.
+- **Data Metrics**: Generates periodic snapshots of debt state, client health, and dialer performance.

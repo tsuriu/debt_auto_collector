@@ -184,8 +184,13 @@ class ReportService:
             
             db = Database().get_db()
             
+            name = self.instance.get('instance_name', 'default')
+            erp_type = self.instance.get('erp', {}).get('type', 'ixc')
+            oid = str(self.instance.get('_id', ''))
+            instance_full_id = f"{name}-{erp_type}-{oid}"
+            
             report_doc = {
-                "instance_full_id": f"{self.instance.get('instance_name')}-{self.instance.get('_id')}", # Best effort ID
+                "instance_full_id": instance_full_id,
                 "last_run_timestamp": datetime.now(),
                 "date_collected": datetime.now().strftime("%Y-%m-%d"),
                 "total_records": len(cdrs),

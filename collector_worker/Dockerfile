@@ -12,4 +12,4 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY collector_worker .
 
-CMD ["python", "main.py", "--job", "service", "--debug"]
+CMD ["python", "main.py", "--job", "service"]

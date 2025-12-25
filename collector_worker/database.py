@@ -34,7 +34,7 @@ class Database:
 
     def ensure_collections(self):
         """Ensures all required collections exist."""
-        required = ["clients", "bills", "history_action_log", "last_reports", "data_reference", "instance_config"]
+        required = ["clients", "bills", "history_action_log", "last_reports", "data_reference", "instance_config", "metrics"]
         existing = self.get_collections()
         created = []
         
@@ -71,6 +71,9 @@ class Database:
                 ("details.number", 1), 
                 ("occurred_at", -1)
             ])
+
+            # Metrics
+            self.db.metrics.create_index([("instance_full_id", 1), ("timestamp", -1)])
             return True
         except Exception as e:
             logger.error(f"Error ensuring indices: {e}")
