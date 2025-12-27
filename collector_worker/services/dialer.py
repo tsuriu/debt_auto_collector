@@ -11,6 +11,8 @@ class Dialer:
         self.config = instance_config
         self.pabx = instance_config.get('asterisk', {})
         self.min_days = instance_config.get('charger', {}).get('minimum_days_to_charge', 7)
+        self.dial_per_day = instance_config.get('charger', {}).get('dial_per_day', 3)
+        self.dial_interval = instance_config.get('charger', {}).get('dial_interval', 4)
         
         # Construct instance_full_id for DB queries
         name = instance_config.get('instance_name', 'default')
@@ -40,10 +42,10 @@ class Dialer:
             "occurred_at": {"$gte": today_start}
         }
         
-        # 1. Check Max Calls per Day (3)
+        # 1. Check Max Calls per Day
         count_today = self.db.history_action_log.count_documents(query)
-        if count_today >= 3:
-            logger.debug(f"Blocked {number}: Max 3 calls reached for today.")
+        if count_today >= self.dial_per_day:
+            logger.debug(f"Blocked {number}: Max {self.dial_per_day} calls reached for today.")
             return False
             
         # 2. Check Interval (4h)
@@ -66,8 +68,8 @@ class Dialer:
             last_time = last_call.get('occurred_at')
             if last_time:
                 diff = datetime.now() - last_time
-                if diff < timedelta(hours=4):
-                    logger.debug(f"Blocked {number}: Last call was {diff} ago (<4h).")
+                if diff < timedelta(hours=self.dial_interval):
+                    logger.debug(f"Blocked {number}: Last call was {diff} ago (<{self.dial_interval}h).")
                     return False
         
         return True
