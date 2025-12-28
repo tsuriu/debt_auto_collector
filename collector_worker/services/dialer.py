@@ -77,13 +77,13 @@ class Dialer:
     def build_queue(self, bills):
         if not self.check_window():
             logger.info("Outside call window. Skipping queue build.")
-            return []
+            return [], 0
 
         # Filter strictly by expired age > min_days (e.g. 7)
         eligible_bills = [b for b in bills if b.get('expired_age', 0) >= self.min_days]
+        eligible_count = len(eligible_bills)
         
-        # Group by Client to aggregate values (optional but good for context)
-        # But we technically just need to trigger calls for the client.
+        # Group by Client to aggregate values
         client_map = {}
         for bill in eligible_bills:
             cid = bill.get('id_cliente')
@@ -93,9 +93,13 @@ class Dialer:
             
         call_queue = []
         
+        # We need to sort by expired_age BEFORE limiting
+        # To do that properly, let's first prepare the potential calls list
+        potential_calls = []
+
         for cid, client_bills in client_map.items():
             sample = client_bills[0]
-            expired_age = sample.get('expired_age', 0)
+            max_expired_age = max(b.get('expired_age', 0) for b in client_bills)
             total_value = sum(float(b.get('valor', 0)) for b in client_bills)
             client_name = sample.get('razao') or sample.get('fantasia')
             bill_ids = [b.get('full_id') for b in client_bills if b.get('full_id')]
@@ -115,21 +119,46 @@ class Dialer:
                     if len(cleaned) >= 8:
                         unique_numbers.add(cleaned)
             
-            # Check availability for EACH number
+            # For each client, we might have multiple numbers. 
+            # But "never can keep two elements with same full_id" 
+            # If we add multiple numbers for SAME client with SAME bills, they share same full_id?
+            # Actually, full_id is per bill. 
+            # If we add two items to queue for same client (different numbers), 
+            # they will BOTH have the same `bill_ids` list.
+            # User says: "in queue never can keep two elements with same full_id"
+            # This implies if we queue a client, we pick ONE number if multiple are available?
+            # Or if we pick multiple numbers, they must be distinct entries, 
+            # but then they share the same bills.
+            # Let's interpret "never keep two elements with same full_id" as:
+            # "No two queue items should represent the same set of bills".
+            # Which effectively means one queue item per client (or per unique bill set).
+            
+            added_for_client = False
             for number in unique_numbers:
+                if added_for_client:
+                    break # Take only first valid number to avoid "same full_id" in queue
+                
                 if self.can_call_number(number):
-                    call_queue.append({
+                    potential_calls.append({
                         "client_id": cid,
-                        "expired_age": expired_age,
+                        "expired_age": max_expired_age,
                         "contact": number,
                         "client_name": client_name,
                         "total_value": total_value,
                         "bill_ids": bill_ids
                     })
+                    added_for_client = True
                 else:
-                    logger.debug(f"Number {number} for Client {cid} is blocked (4h rule)")
+                    logger.debug(f"Number {number} for Client {cid} is blocked (rules)")
             
-        return call_queue
+        # Sort by expired_age descending
+        potential_calls.sort(key=lambda x: x['expired_age'], reverse=True)
+
+        # Limit by num_channel_available
+        limit = self.pabx.get('num_channel_available', 10)
+        call_queue = potential_calls[:limit]
+            
+        return call_queue, eligible_count
 
     def trigger_call(self, call_data):
         number = call_data['contact']

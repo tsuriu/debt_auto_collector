@@ -175,9 +175,9 @@ class ReportService:
             # Enrich with events
             # This might be slow for 1000s of records. try.py did it sequentially.
             # We will keep it sequential for now as per try.py logic.
-            for cdr in cdrs:
-                uid = cdr.get("uniqueid")
-                cdr["events"] = self.fetch_events(uid) if uid else []
+            # for cdr in cdrs:
+            #     uid = cdr.get("uniqueid")
+            #     cdr["events"] = self.fetch_events(uid) if uid else []
 
             # Insert into 'last_reports' collection
             # Requirement: "fetch_cdr_list return must be inserted in last_reports collection and add a key with last run timestamp"

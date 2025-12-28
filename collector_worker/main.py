@@ -240,27 +240,14 @@ def run_dialer_job():
                 logger.info(f"No expired bills found for {instance.get('instance_name')}")
                 continue
 
-            queue = dialer.build_queue(bills)
+            queue, eligible_count = dialer.build_queue(bills)
             
-            logger.info(f"Queue for {instance.get('instance_name')}: {len(queue)} calls")
+            logger.info(f"Dialer for {instance.get('instance_name')}: {eligible_count} eligible, queuing {len(queue)} calls.")
             
-            # Get limit from finding settings or default to 10
-            limit = instance.get('asterisk', {}).get('num_channel_available', 10)
-
-            sorted_queue = sorted(
-                queue,
-                key=lambda x: x.get("expired_age", 0),
-                reverse=True
-            )
-
             count = 0
-            for call in sorted_queue[:limit]:
+            for call in queue:
                 # Check 4h window again (just in case multiple numbers for same client in queue)
-                # Although queue builder handles it, `dialer.trigger_call` updates the map.
-                # But `dialer.trigger_call` doesn't check `can_call_number`, it just dials.
-                # Ideally we check inside loop? 
-                # Let's trust build_queue for now, or add check if strict. 
-                # `dialer.trigger_call` tracks `number_last_called`.
+                # Although queue builder handles it now with the added_for_client flag.
                 
                 if dialer.trigger_call(call):
                     count += 1
@@ -312,6 +299,7 @@ def run_dialer_job():
                 "action": "job_dialer_stats",
                 "occurred_at": datetime.now(),
                 "details": {
+                    "eligible": eligible_count,
                     "queue_size": len(queue),
                     "triggered": count
                 }
