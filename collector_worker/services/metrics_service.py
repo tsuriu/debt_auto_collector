@@ -12,6 +12,34 @@ class MetricsService:
         self.instance_full_id = f"{name}-{erp_type}-{oid}"
         self.db = Database().get_db()
 
+    # Default Reverse Map (fallback/base) derived from try2.py logic
+    DEFAULT_REVERSE_MAP = {
+        'neighborhood': {
+            'Tabuleiro dos Martins': ['tabuleiro', 'tabuleiro dos martins', 'tabuleiro do martins', 'martins'],
+            'Tabuleiro do Pinto': ['tabuleiro do pinto', 'tabuleiro do pinto ', 'tabuleiro do pinto', 'tabuleiro do pinto.'],
+            'Antônio Lins': [
+                'antonio lins', 'antónio lins', 'antônio lins de souza', 
+                'prefeito antônio lins de souza', 'antonio lins de souza', 
+                'pref. antonio lins de souza', 'prefeito antonio lins', 
+                'prefeito antonio lins de souza', 'prefeito antonio lins souza' # Added missing variant
+            ],
+            'Brasil Novo': ['brasil novo', 'complexo brasil novo'],
+            'Santos Dumontt': ['santos dumont', 'santos dumontt'],
+            'Palmeiras': ['palmeiras', 'recanto das palmeiras'],
+            'Cidade Universitária': ['cidade universitária', 'cidade universitaria'],
+            'Forene': ['forene', 'forene '],
+            'Nova Satuba': ['nova satuba'],
+            'Maceió': ['maceió', 'maceio'],
+            'Rio Largo': ['rio largo'],
+            'Campo dos Palmares': ['campo dos palmares'],
+            'Aeroporto': ['aeroporto'],
+            'Cambuci': ['cambuci'],
+            'Centro': ['centro'],
+            'Conjunto Bandeirante': ['conjunto bandeirante', 'conj. bandeirante'],
+            'Porto do Milazzo': ['porto do milazzo']
+        }
+    }
+
     def collect_metrics(self):
         """
         Extracts metrics from database for this specific instance and saves to 'metrics' collection.
@@ -90,15 +118,50 @@ class MetricsService:
                 # Run aggregation
                 results = list(self.db.bills.aggregate(pipeline_key))
                 
-                # Format Result: key -> value -> count? 
-                # Or just list of objects? 
-                # Request says: data.bill.bill_stats must be based in...
-                # db.bills.aggregate([{ $group: { _id: "$key", count: { $sum: 1 } } }])
-                # This implies the result for ONE key.
-                # Since we have multiple keys, we likely want a dictionary where keys are the field names.
-                # ex: bill_stats: { "bairro": [{"_id": "Centro", "count": 10}, ...], "endereco": ... }
-                
-                bill_stats_result[key] = results
+                # Special Logic for 'bairro' (Neighborhood)
+                if key == "bairro":
+                    # 1. Fetch Reverse Maps (Default + Instance)
+                    default_map = self.DEFAULT_REVERSE_MAP.get('neighborhood', {})
+                    instance_map = self.instance.get('erp', {}).get('reverse_map', {}).get('neighborhood', {})
+                    
+                    # Merge: Instance overrides Default if same correct name, or extends.
+                    # We want to build a lookup from BOTH.
+                    
+                    lookup_map = {}
+                    
+                    # Helper to populate lookup
+                    def populate_lookup(source_map):
+                        for correct, variants in source_map.items():
+                             if isinstance(variants, list):
+                                 for v in variants:
+                                     if v:
+                                         lookup_map[v.lower().strip()] = correct
+                    
+                    # Populate Default first
+                    populate_lookup(default_map)
+                    # Populate Instance second (overrides)
+                    populate_lookup(instance_map)
+                    
+                    # 2. Consolidate Results (Normalization)
+                    consolidated = {}
+                    for item in results:
+                        raw_name = item.get("_id")
+                        count = item.get("count", 0)
+                        
+                        if not raw_name:
+                            final_name = "Indefinido"
+                        else:
+                            norm_name = str(raw_name).lower().strip()
+                            # Use stripped raw name for fallback title case
+                            final_name = lookup_map.get(norm_name, str(raw_name).strip().title())
+                        
+                        consolidated[final_name] = consolidated.get(final_name, 0) + count
+                    
+                    # 3. Assign Dictionary directly (Format: {Name: Count})
+                    bill_stats_result[key] = consolidated
+                else:
+                    # Default behavior for other keys: List of objects [{_id: ..., count: ...}]
+                    bill_stats_result[key] = results
 
             # 3. Action Log Metrics (Today's activities)
             today_start = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)

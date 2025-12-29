@@ -101,7 +101,8 @@ The Service runs on a schedule defined in `main.py`.
 2.  **Aggregate Bills**: 
     *   Total and Expired counts.
     *   **Classification**: Counts and Total Value for `pre_force_debt_collection` and `force_debt_collection`.
-    *   **Bill Stats**: Aggregates counts individually by `id_condominio`, `bairro`, `endereco`, `instance_name`, `data_vencimento`, and `erp_type`.
+    *   **Bill Stats**: Aggregates counts individually by key. `bairro` is returned as a dictionary `{Name: Count}` after normalization. Other keys return a list of objects.
+    *   **Normalization**: Uses `instance.erp.reverse_map.neighborhood` to normalize `bairro` names (e.g., merging synonyms) before aggregation.
 3.  **Action Logs**: Counts total dialer actions triggered for the current day.
 4.  **CDR Analytics**: Fetches the latest report from `last_reports` to compute disposition distribution and average call duration.
 5.  **Snapshot**: Saves all metrics into the `metrics` collection with a timestamp.
