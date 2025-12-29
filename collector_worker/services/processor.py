@@ -133,13 +133,23 @@ class Processor:
                 
         return processed
 
-    def merge_data(self, bills, clients):
+    def merge_data(self, bills, clients, condominiums=None):
         # Index clients by ID for fast lookup
         # Ensure ID keys are strings for matching if clients came from DB (where they might depend on how they were stored)
         # But we just enforced ints in process_clients.
         # If 'clients' comes from MongoDB find(), and we stored them as Int, they are Int.
         client_map = {str(c['id']): c for c in clients}
         
+        # Index condominiums by ID
+        condo_map = {}
+        if condominiums:
+            for c in condominiums:
+                # Ensure we map from INT (as stored) or match types
+                cid = c.get('id')
+                name = c.get('condominio')
+                if cid and name:
+                    condo_map[cid] = name
+
         merged_charges = []
         
         for bill in bills:
@@ -169,6 +179,10 @@ class Processor:
 
             # Additional keys from client
             merged_bill = bill.copy()
+            # Resolve Condominium Name
+            condo_id = client.get('id_condominio')
+            condo_name = condo_map.get(condo_id, condo_id) if condo_id else ''
+
             merged_bill.update({
                 "telefone_celular": client.get('telefone_celular', ''),
                 "telefone_comercial": client.get('telefone_comercial', ''),
@@ -177,7 +191,7 @@ class Processor:
                 "fantasia": client.get('fantasia', ''),
                 "bairro": client.get('bairro', ''),
                 "endereco": client.get('endereco', ''),
-                "id_condominio": client.get('id_condominio', ''),
+                "id_condominio": condo_name, # Mapped to name as requested
                 "ativo": client.get('ativo', ''),
                 "participa_pre_cobranca": client.get('participa_pre_cobranca', ''),
                 "tipo_pessoa": client.get('tipo_pessoa') or client.get('pessoa') or '',
@@ -199,3 +213,16 @@ class Processor:
             merged_charges.append(merged_bill)
             
         return merged_charges
+
+    def process_condominiums(self, raw_condos):
+        processed = []
+        for condo in raw_condos:
+            try:
+                processed.append({
+                    "id": self._to_int(condo.get('id')),
+                    "condominio": condo.get('condominio'),
+                    "ultimo_update": datetime.now()
+                })
+            except Exception as e:
+                logger.warning(f"Skipping invalid condominium: {e}")
+        return processed

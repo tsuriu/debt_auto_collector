@@ -151,8 +151,11 @@ def run_bills_update_job():
             if not instance_clients:
                 logger.warning(f"No clients found in 'clients' collection for {instance_full_id}. Skipping merge.")
             
+            # Fetch Condominiums for mapping
+            instance_condos = list(db.condominium.find({"instance_full_id": instance_full_id}))
+
             # Merge / Create Charges
-            charges = processor.merge_data(processed_bills, instance_clients)
+            charges = processor.merge_data(processed_bills, instance_clients, condominiums=instance_condos)
             
             upserted_count = 0
             modified_count = 0
@@ -390,13 +393,64 @@ def run_metrics_job():
         except Exception as e:
             logger.error(f"Error in Metrics Job for {instance.get('instance_name')}: {e}")
 
+def run_condominium_update_job():
+    logger.info("Starting Job: CONDOMINIUM UPDATE")
+    instances = get_active_instances()
+    
+    for instance in instances:
+        try:
+            instance_full_id = _get_instance_full_id(instance)
+            logger.info(f"Processing condominiums for instance: {instance.get('instance_name')}")
+            
+            client = IxcClient(instance)
+            processor = Processor(instance)
+            db = Database().get_db()
+            
+            # Fetch
+            raw_condos = client.get_condominium()
+            logger.info(f"Fetched {len(raw_condos)} condominiums")
+            
+            # Process
+            processed_condos = processor.process_condominiums(raw_condos)
+            
+            if processed_condos:
+                from pymongo import UpdateOne
+                ops = []
+                for c in processed_condos:
+                    c['instance_full_id'] = instance_full_id
+                    ops.append(
+                        UpdateOne(
+                            {"instance_full_id": instance_full_id, "id": c['id']},
+                            {"$set": c},
+                            upsert=True
+                        )
+                    )
+                
+                if ops:
+                    res = db.condominium.bulk_write(ops)
+                    logger.info(f"Saved/Updated {len(ops)} condominiums")
+            
+            # Log Execution (Simplified, no full stats object requirement in spec, but good practice)
+            db.history_action_log.insert_one({
+                "instance_full_id": instance_full_id,
+                "action": "job_condominium_execution",
+                "occurred_at": datetime.now(),
+                "details": {
+                    "fetched": len(raw_condos),
+                    "processed": len(processed_condos)
+                }
+            })
+            
+        except Exception as e:
+            logger.error(f"Error in Condominium Job for {instance.get('instance_name')}: {e}")
+
 def main():
     import argparse
     
     parser = argparse.ArgumentParser(description="Debt Collector Service")
     parser.add_argument(
         "--job", 
-        choices=["clients", "bills", "dialer", "reports", "service", "metrics"], 
+        choices=["clients", "bills", "dialer", "reports", "service", "metrics", "condominium"], 
         default="service",
         help="Run a specific job manually (once) or start the long-running service (default)"
     )
@@ -464,6 +518,10 @@ def main():
         run_metrics_job()
         return
 
+    if args.job == "condominium":
+        run_condominium_update_job()
+        return
+
 
     # Service / Scheduler Mode
     if args.job == "service":
@@ -477,6 +535,9 @@ def main():
         
         # Metrics: every 6 hours
         schedule.every(30).minutes.do(run_metrics_job)
+        
+        # Condominium: Once a week (Monday 6:00 AM)
+        schedule.every().monday.at("06:00").do(run_condominium_update_job)
 
         # Dialer: every 20 minutes between 8-18 (handled by check_window inside job)
         schedule.every(20).minutes.do(run_dialer_job)

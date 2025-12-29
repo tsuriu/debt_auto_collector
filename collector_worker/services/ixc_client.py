@@ -113,3 +113,13 @@ class IxcClient:
             ])
         }
         return self.fetch_all("fn_areceber", query_params)
+
+    def get_condominium(self):
+        query_params = {
+            "qtype": "cliente_condominio.id",
+            "query": "1",
+            "oper": ">=",
+            "sortname": "cliente_condominio.id",
+            "sortorder": "desc"
+        }
+        return self.fetch_all("cliente_condominio", query_params)
