@@ -67,7 +67,7 @@ class MetricsService:
 
             # Bill Stats - Aggregated by specific keys
             bill_stats_result = {}
-            target_keys = ["id_condominio", "bairro", "endereco", "instance_name", "data_vencimento", "erp_type"]
+            target_keys = ["id_condominio", "bairro", "instance_name", "data_vencimento", "erp_type"]
             
             for key in target_keys:
                 # Map key to valid mongo field if needed. 
