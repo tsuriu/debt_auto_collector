@@ -159,6 +159,41 @@ class MetricsService:
                     
                     # 3. Assign Dictionary directly (Format: {Name: Count})
                     bill_stats_result[key] = consolidated
+                
+                # Special Logic for 'id_condominio' (Condo Name) - Same Normalization Pattern
+                elif key == "id_condominio":
+                    # 1. Fetch Reverse Map (Condominium)
+                    # No default map for condos currently hardcoded (or check if needed), assume DB only for now or empty default.
+                    # Or keep consistent structure.
+                    
+                    instance_map = self.instance.get('erp', {}).get('reverse_map', {}).get('condominium', {})
+                    lookup_map = {}
+                    
+                    # Consolidate lookup
+                    for correct, variants in instance_map.items():
+                         if isinstance(variants, list):
+                             for v in variants:
+                                 if v:
+                                     lookup_map[v.lower().strip()] = correct
+                    
+                    # 2. Consolidate Results
+                    consolidated = {}
+                    for item in results:
+                        raw_name = item.get("_id")
+                        count = item.get("count", 0)
+                
+                        if not raw_name:
+                            final_name = "Indefinido"
+                        else:
+                            # If it's an ID (digits), handle? 
+                            # Processor logic tries to map ID to Name. So raw_name should be Name (str) or ID (str/int).
+                            # Normalization applies to Names.
+                            norm_name = str(raw_name).lower().strip()
+                            final_name = lookup_map.get(norm_name, str(raw_name).strip().title())
+                    
+                    # 3. Assign Dictionary
+                    bill_stats_result[key] = consolidated
+
                 else:
                     # Default behavior for other keys: List of objects [{_id: ..., count: ...}]
                     bill_stats_result[key] = results
