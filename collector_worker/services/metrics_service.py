@@ -28,10 +28,15 @@ class MetricsService:
                 {"instance_full_id": self.instance_full_id, "status": "A"}
             ))
             
-            # Clients with expired open debt
-            clients_with_expired_debt = len(self.db.bills.distinct(
-                "id_cliente", 
-                {"instance_full_id": self.instance_full_id, "vencimento_status": "expired"}
+            # Clients Classification
+            clients_pre_force = len(self.db.bills.distinct(
+                "id_cliente",
+                {"instance_full_id": self.instance_full_id, "collection_rule": "pre_force_debt_collection"}
+            ))
+            
+            clients_force = len(self.db.bills.distinct(
+                "id_cliente",
+                {"instance_full_id": self.instance_full_id, "collection_rule": "force_debt_collection"}
             ))
 
             # 2. Bill Metrics
@@ -42,21 +47,58 @@ class MetricsService:
                 "vencimento_status": "expired"
             })
             
-            # Aggregate Total Expired Debt
-            pipeline_expired = [
-                {"$match": {"instance_full_id": self.instance_full_id, "vencimento_status": "expired"}},
-                {"$group": {"_id": None, "total_debt": {"$sum": "$valor_aberto"}}}
+            # Bill Classification Counters & Sums
+            
+            # Pre-Force Debt Collection
+            pipeline_pre_force = [
+                {"$match": {"instance_full_id": self.instance_full_id, "collection_rule": "pre_force_debt_collection"}},
+                {"$group": {"_id": None, "count": {"$sum": 1}, "total_value": {"$sum": "$valor_aberto"}}}
             ]
-            debt_expired_result = list(self.db.bills.aggregate(pipeline_expired))
-            total_expired_debt_amount = debt_expired_result[0]["total_debt"] if debt_expired_result else 0
+            res_pre_force = list(self.db.bills.aggregate(pipeline_pre_force))
+            pre_force_data = res_pre_force[0] if res_pre_force else {"count": 0, "total_value": 0}
 
-            # Aggregate Total In-Time Debt
-            pipeline_intime = [
-                {"$match": {"instance_full_id": self.instance_full_id, "vencimento_status": "current"}},
-                {"$group": {"_id": None, "total_debt": {"$sum": "$valor_aberto"}}}
+            # Force Debt Collection
+            pipeline_force = [
+                {"$match": {"instance_full_id": self.instance_full_id, "collection_rule": "force_debt_collection"}},
+                {"$group": {"_id": None, "count": {"$sum": 1}, "total_value": {"$sum": "$valor_aberto"}}}
             ]
-            debt_intime_result = list(self.db.bills.aggregate(pipeline_intime))
-            total_intime_debt_amount = debt_intime_result[0]["total_debt"] if debt_intime_result else 0
+            res_force = list(self.db.bills.aggregate(pipeline_force))
+            force_data = res_force[0] if res_force else {"count": 0, "total_value": 0}
+
+            # Bill Stats - Aggregated by specific keys
+            bill_stats_result = {}
+            target_keys = ["id_condominio", "bairro", "endereco", "instance_name", "data_vencimento", "erp_type"]
+            
+            for key in target_keys:
+                # Map key to valid mongo field if needed. 
+                # instance_name and erp_type might be consistent across instance, but we can group by them if they exist in document.
+                # However, instance_name is likely constant for the instance_full_id scope.
+                
+                # Use '$' prefix for field reference in $group
+                # If key is nested, adjust. For now assume flat or top level.
+                field_ref = f"${key}"
+                if key == "erp_type":
+                     # In some docs it might be flat, in others nested? 
+                     # Processor adds 'erp_type' at root level.
+                     pass 
+                
+                pipeline_key = [
+                    {"$match": {"instance_full_id": self.instance_full_id}},
+                    {"$group": {"_id": field_ref, "count": {"$sum": 1}}}
+                ]
+                
+                # Run aggregation
+                results = list(self.db.bills.aggregate(pipeline_key))
+                
+                # Format Result: key -> value -> count? 
+                # Or just list of objects? 
+                # Request says: data.bill.bill_stats must be based in...
+                # db.bills.aggregate([{ $group: { _id: "$key", count: { $sum: 1 } } }])
+                # This implies the result for ONE key.
+                # Since we have multiple keys, we likely want a dictionary where keys are the field names.
+                # ex: bill_stats: { "bairro": [{"_id": "Centro", "count": 10}, ...], "endereco": ... }
+                
+                bill_stats_result[key] = results
 
             # 3. Action Log Metrics (Today's activities)
             today_start = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
@@ -105,13 +147,19 @@ class MetricsService:
                     "clients": {
                         "total": total_clients,
                         "count_with_open_debt": clients_with_open_debt,
-                        "count_with_expired_open_debt": clients_with_expired_debt
+                        # New counters
+                        "count_pre_force_debt_collection": clients_pre_force,
+                        "count_force_debt_collection": clients_force
                     },
                     "bill": {
                         "total": total_bills,
                         "expired": expired_bills,
-                        "total_expired_debt_amount": round(total_expired_debt_amount, 2),
-                        "total_intime_debt_amount": round(total_intime_debt_amount, 2)
+                        # New counters & Sums
+                        "count_pre_force_debt_collection": pre_force_data["count"],
+                        "value_pre_force_debt_collection": round(pre_force_data["total_value"], 2),
+                        "count_force_debt_collection": force_data["count"],
+                        "value_force_debt_collection": round(force_data["total_value"], 2),
+                        "bill_stats": bill_stats_result
                     },
                     "actions_today": {
                         "dialer_triggers": triggered_calls

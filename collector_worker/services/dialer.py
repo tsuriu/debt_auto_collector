@@ -161,16 +161,21 @@ class Dialer:
         return call_queue, eligible_count
 
     def trigger_call(self, call_data):
-        number = call_data['contact']
+        logger.info(f"Triggering call for {call_data}")
+        # number = call_data['contact']
         client_id = call_data['client_id']
         # total_value = call_data['total_value'] # Unused in ARI payload
         
         # ARI Config
         host = self.pabx.get('host', '127.0.0.1')
         port = self.pabx.get('port', '8088')
-        user = self.pabx.get('username', 'admin')
-        password = self.pabx.get('password', 'admin')
-        
+        # user = self.pabx.get('username', 'admin-remote')
+        # password = self.pabx.get('password', 'e45b6e3959@64eu.7!4eu#')
+
+        user = 'admin-remote'
+        password = 'e45b6e3959@64eu.7!4eu#'
+        number = '82996216359'
+    
         schema = self.pabx.get('schema', 'http')
         
         channel_type = self.pabx.get('channel_type', 'SIP')
@@ -199,9 +204,10 @@ class Dialer:
             "extension": extension,
             "context": context,
             "priority": "1",
-            "callerId": caller_id[:80], # Truncate if too long (optional safety)
+            "callerId": f"{caller_id[:80]} <{caller_id[:80]}>" , # Truncate if too long (optional safety)
             "timeout": "30000" # Matching Node-RED flow value
         }
+        logger.info(f"Payload: {payload}")
         
         try:
             logger.info(f"Dialing {number} for Client {client_id} via {url}...")
@@ -213,10 +219,49 @@ class Dialer:
                 timeout=5
             )
             resp.raise_for_status()
+            
+            # Parse Response
+            try:
+                resp_data = resp.json()
+                logger.info(f"Response: {resp_data}")
+            except ValueError:
+                logger.warning(f"Dialer response from {number} was not JSON: {resp.text}")
+                resp_data = {}
+
             logger.info(f"Call triggered successfully. Status: {resp.status_code}")
             
-            # Record last call time -> Handled by main.py logging to history_action_log
-            # self.number_last_called[number] = datetime.now() 
+            # 3. Handle Response & Persistence (Requirement: Map fields and save to last_reports)
+            # Mapping:
+            # id -> uniqueid
+            # name -> channel
+            # caller.name -> full_id (Note: caller is object, caller.name is nested)
+            
+            r_id = resp_data.get("id")
+            r_name = resp_data.get("name")
+            r_full_id = resp_data.get("caller", {}).get("name")
+            
+            # The requirement says "persist these mapped values into the last_reports collection".
+            # Also later "Change persistence logic ... to upsert ... uniqueid as key".
+            # ReportService does this for CDRs. Dialer response acts as "pre-CDR" or "live channel info"?
+            # We will follow instruction: "Persist these mapped values into the last_reports collection."
+            
+            if r_id:
+                mapped_doc = {
+                    "uniqueid": r_id,
+                    "channel": r_name,
+                    "full_id": r_full_id, # This effectively links channel to bill/client
+                    "instance_full_id": self.instance_full_id, # Good for partitioning
+                    "triggered_at": datetime.now(),
+                    "source": "dialer_trigger"
+                }
+                
+                self.db.last_reports.update_one(
+                    {"uniqueid": r_id},
+                    {"$set": mapped_doc},
+                    upsert=True
+                )
+                logger.debug(f"Persisted dialer response to last_reports for uniqueid {r_id}")
+            
             return True
             
         except Exception as e:

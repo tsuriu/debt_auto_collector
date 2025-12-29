@@ -7,6 +7,7 @@ class Processor:
         self.instance_name = instance_config.get('instance_name', 'default')
         self.erp_type = instance_config.get('erp', {}).get('type', 'ixc')
         self.instance_pre_id = f"{self.instance_name}-{self.erp_type}"
+        self.min_days = instance_config.get('charger', {}).get('minimum_days_to_charge', 0)
 
     def _to_int(self, val):
         if isinstance(val, int):
@@ -188,6 +189,13 @@ class Processor:
             merged_bill['erp_type'] = self.erp_type
             merged_bill['last_updated'] = datetime.now()
             
+            # Classification Rule
+            expired_age = merged_bill.get('expired_age', 0)
+            if expired_age <= self.min_days:
+                merged_bill['collection_rule'] = 'pre_force_debt_collection'
+            else:
+                merged_bill['collection_rule'] = 'force_debt_collection'
+
             merged_charges.append(merged_bill)
             
         return merged_charges

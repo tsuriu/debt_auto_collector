@@ -8,9 +8,27 @@ from database import Database
 from utils.time_utils import is_within_operational_window
 
 class ReportService:
+
     CDR_FIELDS = [
-        "calldate", "src", "dst", "dcontext", "channel", 
-        "dstchannel", "lastapp", "disposition", "duration", "uniqueid"
+        "calldate",
+        "src",
+        "dst",
+        "dcontext",
+        "channel",
+        "dstchannel",
+        "lastapp",
+        "disposition",
+        "duration",
+        "uniqueid"
+    ]
+
+    CDR_FIELDS_INDEX = [        
+        "calldate",
+        "src",
+        "channel",
+        "disposition",
+        "duration",
+        "uniqueid"
     ]
 
     EVENT_FIELDS = [
@@ -90,9 +108,7 @@ class ReportService:
             "timeInSecs": "on",
             "filter": "Filter"
         }
-        
-        logger.debug(f"Fetching CDRs with payload: {payload}")
-        
+                
         try:
             r = self.session.post(self.cdr_url, data=payload, timeout=60)
             if r.status_code != 200:
@@ -107,9 +123,12 @@ class ReportService:
                 return []
 
             rows = json.loads(match.group(1))
+            logger.debug(f"Fetched CDRs: {rows}")
             cdrs = []
             for row in rows:
                 cdr = {field: self.clean_html(row[i]) if i < len(row) else None for i, field in enumerate(self.CDR_FIELDS)}
+                cdr = {k: v for k, v in cdr.items() if k in self.CDR_FIELDS_INDEX}
+                cdr["full_id"] = cdr.pop("src") if "src" in cdr else cdr.get("full_id")
                 cdrs.append(cdr)
             
             return cdrs
@@ -168,7 +187,7 @@ class ReportService:
             self.login()
             cdrs = self.fetch_cdr_list()
             logger.info(f"Fetched {len(cdrs)} CDR records")
-            
+            logger.debug(f"Fetched CDRs: {cdrs}")
             if not cdrs:
                 return
 
@@ -180,7 +199,7 @@ class ReportService:
             #     cdr["events"] = self.fetch_events(uid) if uid else []
 
             # Insert into 'last_reports' collection
-            # Requirement: "fetch_cdr_list return must be inserted in last_reports collection and add a key with last run timestamp"
+            # Requirement: Upsert individual CDRs using uniqueid as key
             
             db = Database().get_db()
             
@@ -189,16 +208,28 @@ class ReportService:
             oid = str(self.instance.get('_id', ''))
             instance_full_id = f"{name}-{erp_type}-{oid}"
             
-            report_doc = {
-                "instance_full_id": instance_full_id,
-                "last_run_timestamp": datetime.now(),
-                "date_collected": datetime.now().strftime("%Y-%m-%d"),
-                "total_records": len(cdrs),
-                "data": cdrs
-            }
+            from pymongo import UpdateOne
+            ops = []
             
-            db.last_reports.insert_one(report_doc)
-            logger.info("Saved report to 'last_reports' collection")
+            for cdr in cdrs:
+                # Enrich with instance metadata
+                cdr['instance_full_id'] = instance_full_id
+                cdr['last_run_timestamp'] = datetime.now()
+                cdr['date_collected'] = datetime.now().strftime("%Y-%m-%d")
+                
+                # Check for uniqueid to be safe
+                if cdr.get('uniqueid'):
+                    ops.append(
+                        UpdateOne(
+                            {"uniqueid": cdr["uniqueid"]},
+                            {"$set": cdr},
+                            upsert=True
+                        )
+                    )
+            
+            if ops:
+                res = db.last_reports.bulk_write(ops)
+                logger.info(f"Upserted {len(ops)} CDRs to 'last_reports' collection")
             
             return len(cdrs)
 

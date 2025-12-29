@@ -23,12 +23,16 @@ def run_clients_update_job():
     
     for instance in instances:
         try:
+            start_time = time.time()
             instance_full_id = _get_instance_full_id(instance)
             logger.info(f"Processing instance: {instance.get('instance_name')} (ID: {instance_full_id})")
             
             client = IxcClient(instance)
             processor = Processor(instance)
             db = Database().get_db()
+
+            # Snapshot Before
+            start_count = db.clients.count_documents({"instance_full_id": instance_full_id})
             
             # Fetch
             raw_clients = client.get_clients()
@@ -55,19 +59,13 @@ def run_clients_update_job():
                     res = db.clients.bulk_write(ops)
                     logger.info(f"Saved/Updated {len(ops)} clients to 'clients' collection")
                     
-                    # Log Stats
-                    db.history_action_log.insert_one({
-                        "instance_full_id": instance_full_id,
-                        "action": "job_clients_stats",
-                        "occurred_at": datetime.now(),
-                        "details": {
-                            "fetched": len(raw_clients),
-                            "upserted": res.upserted_count,
-                            "modified": res.modified_count,
-                            "matched": res.matched_count,
-                            "deleted": 0
-                        }
-                    })
+                    upserted_count = res.upserted_count
+                    modified_count = res.modified_count
+                    matched_count = res.matched_count
+                else:
+                    upserted_count = 0
+                    modified_count = 0
+                    matched_count = 0
 
                 # SYNC: Delete clients that are NOT in the current processed list for this instance
                 # This ensures clients filtered out (e.g. tipo_pessoa != J) or inactive are removed.
@@ -81,15 +79,8 @@ def run_clients_update_job():
                 if deleted_count > 0:
                     logger.info(f"Synced/Removed {deleted_count} clients from DB (Not in current valid set)")
                     
-                    # Log cleanup stats
-                    db.history_action_log.insert_one({
-                        "instance_full_id": instance_full_id,
-                        "action": "job_clients_cleanup",
-                        "occurred_at": datetime.now(),
-                        "details": {
-                            "deleted": deleted_count
-                        }
-                    })
+                    # Removed intermediate log for cleanup stats to avoid noise
+                    pass
                 
                 # Update Metadata
                 db.data_reference.update_one(
@@ -101,8 +92,31 @@ def run_clients_update_job():
                     }},
                     upsert=True
                 )
+            
+            # Snapshot After
+            end_count = db.clients.count_documents({"instance_full_id": instance_full_id})
+            delta = end_count - start_count
+            elapsed_time = round(time.time() - start_time, 2)
+
+            # Log Execution Summary
+            db.history_action_log.insert_one({
+                "instance_full_id": instance_full_id,
+                "action": "job_clients_execution",
+                "occurred_at": datetime.now(),
+                "details": {
+                    "start_count": start_count,
+                    "end_count": end_count,
+                    "delta": delta,
+                    "elapsed_time_seconds": elapsed_time,
+                    "fetched": len(raw_clients),
+                    "upserted": locals().get('upserted_count', 0),
+                    "modified": locals().get('modified_count', 0),
+                    "matched": locals().get('matched_count', 0),
+                    "deleted": locals().get('deleted_count', 0)
+                }
+            })
                 
-            logger.info(f"Instance {instance.get('instance_name')} - Clients Job Finished.")
+            logger.info(f"Instance {instance.get('instance_name')} - Clients Job Finished. Delta: {delta}, Time: {elapsed_time}s")
             
         except Exception as e:
             logger.error(f"Error in Clients Job for {instance.get('instance_name')}: {e}")
@@ -113,6 +127,7 @@ def run_bills_update_job():
     
     for instance in instances:
         try:
+            start_time = time.time()
             instance_full_id = _get_instance_full_id(instance)
             logger.info(f"Processing instance: {instance.get('instance_name')}")
             
@@ -120,6 +135,9 @@ def run_bills_update_job():
             processor = Processor(instance)
             db = Database().get_db()
             
+            # Snapshot Before
+            start_count = db.bills.count_documents({"instance_full_id": instance_full_id})
+
             # Fetch Bills
             raw_bills = client.get_bills()
             processed_bills = processor.process_bills(raw_bills)
@@ -136,7 +154,11 @@ def run_bills_update_job():
             # Merge / Create Charges
             charges = processor.merge_data(processed_bills, instance_clients)
             
-            
+            upserted_count = 0
+            modified_count = 0
+            matched_count = 0
+            deleted_count = 0
+
             if charges:
                 # We no longer filter by "paid_days". All data returned by processor is considered valid for sync.
                 # If IXC stops returning it (e.g. date range), sync will remove it.
@@ -177,21 +199,8 @@ def run_bills_update_job():
             if deleted_count > 0:
                 logger.info(f"Synced/Removed {deleted_count} bills from DB (Not in current valid set)")
 
-            # Log Stats
-            # Only log if there was any activity to avoid noise? Or always log for heartbeat?
-            # User asked for "counts", implying regular stats.
-            db.history_action_log.insert_one({
-                "instance_full_id": instance_full_id,
-                "action": "job_bills_stats",
-                "occurred_at": datetime.now(),
-                "details": {
-                    "fetched": len(processed_bills), # raw_bills is processed_bills essentially
-                    "upserted": upserted_count,
-                    "modified": modified_count, 
-                    "matched": matched_count,
-                    "deleted": deleted_count
-                }
-            })
+            # Log Stats - REMOVED intermediate log to prevent double entries
+            # db.history_action_log.insert_one({...})
 
             db.data_reference.update_one(
                 {"instance_full_id": instance_full_id},
@@ -202,7 +211,30 @@ def run_bills_update_job():
                 upsert=True
             )
                     
-            logger.info(f"Instance {instance.get('instance_name')} - Bills Job Finished.")
+            # Snapshot After
+            end_count = db.bills.count_documents({"instance_full_id": instance_full_id})
+            delta = end_count - start_count
+            elapsed_time = round(time.time() - start_time, 2)
+
+            # Log Execution Summary
+            db.history_action_log.insert_one({
+                "instance_full_id": instance_full_id,
+                "action": "job_bills_execution",
+                "occurred_at": datetime.now(),
+                "details": {
+                    "start_count": start_count,
+                    "end_count": end_count,
+                    "delta": delta,
+                    "elapsed_time_seconds": elapsed_time,
+                    "fetched": len(processed_bills),
+                    "upserted": upserted_count,
+                    "modified": modified_count,
+                    "matched": matched_count,
+                    "deleted": deleted_count
+                }
+            })
+                    
+            logger.info(f"Instance {instance.get('instance_name')} - Bills Job Finished. Delta: {delta}, Time: {elapsed_time}s")
 
         except Exception as e:
             logger.error(f"Error in Bills Job for {instance.get('instance_name')}: {e}")
@@ -245,7 +277,8 @@ def run_dialer_job():
             logger.info(f"Dialer for {instance.get('instance_name')}: {eligible_count} eligible, queuing {len(queue)} calls.")
             
             count = 0
-            for call in queue:
+            
+            for call in [queue[0]]:
                 # Check 4h window again (just in case multiple numbers for same client in queue)
                 # Although queue builder handles it now with the added_for_client flag.
                 
