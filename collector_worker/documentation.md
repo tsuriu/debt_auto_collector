@@ -57,9 +57,13 @@ The Service runs on a schedule defined in `main.py`.
 **Schedule**: Every 1 hour
 1.  **Fetch**: Retrieves active/open bills from IXC (Due date < Future, > 30 days ago).
 2.  **Process**: Calculates `days_until_due`, `expired_age`, and status.
-3.  **Merge**: Joins bill data with client data (names, phones) from the local `clients` collection.
-4.  **Upsert**: Updates the `bills` collection.
-5.  **Sync**: Removes bills from MongoDB not present in the fetch (e.g., if paid or cancelled).
+3.  **Classify**: Applies `collection_rule`:
+    *   `pre_force_debt_collection`: If `expired_age` <= `minimum_days_to_charge`.
+    *   `force_debt_collection`: If `expired_age` > `minimum_days_to_charge`.
+4.  **Merge**: Joins bill data with client data (names, phones) from the local `clients` collection.
+5.  **Upsert**: Updates the `bills` collection.
+6.  **Sync**: Removes bills from MongoDB not present in the fetch (e.g., if paid or cancelled).
+7.  **Log**: Records execution stats (start/end counts, delta, timing) to `history_action_log`.
 
 ### 3. Dialer (`run_dialer_job`)
 **Schedule**: Every 20 minutes (within active window)
@@ -78,19 +82,26 @@ The Service runs on a schedule defined in `main.py`.
 3.  **Trigger Calls**:
     *   Integrates with Asterisk ARI to initiate calls.
     *   CallerID is set to the Bill ID (for tracking) or Client info.
+    *   **Response Handling**: Captures channel and UniqueID from Asterisk response and upserts to `last_reports`.
 4.  **Log**: Updates `call_history` in `bills` and adds entry to `history_action_log`.
 
 ### 4. Reports Update (`run_reports_update_job`)
 **Schedule**: Triggered 5 minutes after `run_dialer_job` finishes.
 1.  **Login**: Authenticates with the Asterisk/Issabel web interface.
-2.  **Fetch**: Retreives Call Detail Records (CDRs) for the current day.
-3.  **Enrich**: Fetches detailed events for each CDR (if available).
-4.  **Store**: Saves the raw report data to `last_reports` collection.
+2.  **Fetch**: Retrieves Call Detail Records (CDRs) for the current day.
+3.  **Filter**: Keeps only relevant fields (`calldate`, `channel`, `disposition`, `duration`, `uniqueid`).
+4.  **Store**: Upserts individual CDRs into `last_reports` collection using `uniqueid` as key.
     
 ### 5. Metrics Collection (`run_metrics_job`)
 **Schedule**: Every 30 minutes
-1.  **Aggregate Clients**: Counts total clients, clients with open debt, and clients with expired open debt.
-2.  **Aggregate Bills**: Calculates total bills count, total expired bills count, `total_expired_debt_amount`, and `total_intime_debt_amount`.
+1.  **Aggregate Clients**: 
+    *   Total clients.
+    *   Clients with open debt.
+    *   **Classification**: Counts for `pre_force_debt_collection` and `force_debt_collection`.
+2.  **Aggregate Bills**: 
+    *   Total and Expired counts.
+    *   **Classification**: Counts and Total Value for `pre_force_debt_collection` and `force_debt_collection`.
+    *   **Bill Stats**: Aggregates counts individually by `id_condominio`, `bairro`, `endereco`, `instance_name`, `data_vencimento`, and `erp_type`.
 3.  **Action Logs**: Counts total dialer actions triggered for the current day.
 4.  **CDR Analytics**: Fetches the latest report from `last_reports` to compute disposition distribution and average call duration.
 5.  **Snapshot**: Saves all metrics into the `metrics` collection with a timestamp.

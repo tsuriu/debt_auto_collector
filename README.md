@@ -69,7 +69,9 @@ A Python application that replicates the logic of the "Debt Collector" Node-RED 
 - **Strict Data Integrity**: Enforces unique constraints and performance indices on MongoDB.
 - **Rate Limiting**: Respects IXC API limits (100ms delay).
 - **Graceful Error Handling**: Logs errors without crashing the main loop.
-- **CDR Reports**: Automatically fetches call detail records and event logs from Asterisk.
+- **CDR Reports**: Automatically fetches call detail records from Asterisk and optimizes storage.
 - **Structured Logging**: Uses `loguru` for beautiful and configurable service logs.
 - **Self-Healing DB**: Automatically verifies and fixes database indices and collections on startup.
 - **Data Metrics**: Generates periodic snapshots of debt state, client health, and dialer performance.
+- **Debt Classification**: Automatically segregates debts into `pre_force` and `force` collection rules based on aging.
+- **Granular Analytics**: Aggregates bill statistics by neighborhood, condominium, and more for deep insights.
