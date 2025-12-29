@@ -67,7 +67,7 @@ class MetricsService:
 
             # Bill Stats - Aggregated by specific keys
             bill_stats_result = {}
-            target_keys = ["id_condominio", "bairro", "endereco", "instance_name", "data_vencimento", "erp_type"]
+            target_keys = ["id_condominio", "bairro", "instance_name", "data_vencimento", "erp_type"]
             
             for key in target_keys:
                 # Map key to valid mongo field if needed. 
@@ -90,13 +90,46 @@ class MetricsService:
                 # Run aggregation
                 results = list(self.db.bills.aggregate(pipeline_key))
                 
-                # Format Result: key -> value -> count? 
-                # Or just list of objects? 
-                # Request says: data.bill.bill_stats must be based in...
-                # db.bills.aggregate([{ $group: { _id: "$key", count: { $sum: 1 } } }])
-                # This implies the result for ONE key.
-                # Since we have multiple keys, we likely want a dictionary where keys are the field names.
-                # ex: bill_stats: { "bairro": [{"_id": "Centro", "count": 10}, ...], "endereco": ... }
+                # Special Logic for 'bairro' (Neighborhood) - Normalization
+                if key == "bairro":
+                    # 1. Fetch Reverse Map
+                    # Structure expected: { "neighborhood": { "Correct Name": ["synonym1", "synonym2"] } }
+                    neighborhood_map = self.instance.get('erp', {}).get('reverse_map', {}).get('neighborhood', {})
+                    
+                    # 2. Build Lookup (synonym.lower() -> Correct Name)
+                    lookup_map = {}
+                    for correct, variants in neighborhood_map.items():
+                         # Variants must be list
+                         if isinstance(variants, list):
+                             for v in variants:
+                                 if v:
+                                     lookup_map[v.lower().strip()] = correct
+                    
+                    # 3. Consolidate Results
+                    consolidated = {}
+                    for item in results:
+                        raw_name = item.get("_id")
+                        count = item.get("count", 0)
+                        
+                        if not raw_name:
+                            # Handle None/Empty
+                            final_name = "Indefinido"
+                        else:
+                            # Parse logic from try2.py:
+                            # nome_norm = nome.lower()
+                            # bairro_final = busca.get(nome_norm, nome.title())
+                            
+                            norm_name = str(raw_name).lower().strip()
+                            final_name = lookup_map.get(norm_name, str(raw_name).title())
+                        
+                        consolidated[final_name] = consolidated.get(final_name, 0) + count
+                    
+                    # 4. Reconstruct List
+                    # results = [{"_id": name, "count": total} ...]
+                    results = [{"_id": k, "count": v} for k, v in consolidated.items()]
+                    # Optional: Sort by name or count? try2.py sorted by name. 
+                    # Let's sort by name for consistency.
+                    results.sort(key=lambda x: x["_id"])
                 
                 bill_stats_result[key] = results
 
