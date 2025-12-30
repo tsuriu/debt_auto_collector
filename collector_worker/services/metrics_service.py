@@ -95,7 +95,7 @@ class MetricsService:
 
             # Bill Stats - Aggregated by specific keys
             bill_stats_result = {}
-            target_keys = ["id_condominio", "bairro", "instance_name", "data_vencimento", "erp_type"]
+            target_keys = ["id_condominio", "bairro", "instance_name", "expired_age", "erp_type"]
             
             for key in target_keys:
                 # Map key to valid mongo field if needed. 
@@ -190,6 +190,8 @@ class MetricsService:
                             # Normalization applies to Names.
                             norm_name = str(raw_name).lower().strip()
                             final_name = lookup_map.get(norm_name, str(raw_name).strip().title())
+
+                        consolidated[final_name] = consolidated.get(final_name, 0) + count
                     
                     # 3. Assign Dictionary
                     bill_stats_result[key] = consolidated
