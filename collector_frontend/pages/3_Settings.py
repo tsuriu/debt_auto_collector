@@ -2,9 +2,13 @@ import streamlit as st
 import os
 from dotenv import load_dotenv, set_key
 from utils import test_mongo_connection, export_to_json
+from utils_css import apply_light_theme
 import json
 
 st.set_page_config(page_title="Settings", layout="wide")
+
+# Apply light theme
+apply_light_theme()
 
 # Path to root .env
 dotenv_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".env"))

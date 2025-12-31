@@ -4,8 +4,12 @@ from db import get_db
 from bson import ObjectId
 from datetime import datetime
 from utils import status_badge, export_to_json, confirm_action
+from utils_css import apply_light_theme
 
 st.set_page_config(page_title="Manage Instances", layout="wide")
+
+# Apply light theme
+apply_light_theme()
 
 db = get_db()
 instances_col = db.instance_config

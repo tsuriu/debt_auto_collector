@@ -1,12 +1,99 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
+import plotly.graph_objects as go
 from db import get_db
 from datetime import datetime, timedelta
 import time
 from utils import format_currency, safe_get
+from utils_css import apply_light_theme
 
-st.set_page_config(page_title="Monitor Dashboard", layout="wide")
+st.set_page_config(page_title="Collection Dashboard", layout="wide")
+
+# Apply shared light theme
+apply_light_theme()
+
+# Additional Dashboard-specific CSS
+st.markdown("""
+<style>
+    /* KPI Styling */
+    .kpi-label {
+        font-size: 0.875rem !important;
+        color: #64748b !important;
+        font-weight: 600 !important;
+        margin-bottom: 4px !important;
+    }
+    .kpi-value {
+        font-size: 2.25rem !important;
+        font-weight: 700 !important;
+        color: #0f172a !important;
+    }
+    .kpi-trend {
+        font-size: 0.75rem !important;
+        font-weight: 600 !important;
+        padding: 2px 8px !important;
+        border-radius: 9999px !important;
+        margin-left: 8px !important;
+    }
+    .trend-up {
+        background-color: #dcfce7 !important;
+        color: #15803d !important;
+    }
+    
+    /* Progress Bar */
+    .progress-container {
+        width: 100% !important;
+        background-color: #f1f5f9 !important;
+        border-radius: 9999px !important;
+        height: 8px !important;
+        margin-top: 8px !important;
+    }
+    .progress-bar-pre {
+        background-color: #f59e0b !important;
+        height: 8px !important;
+        border-radius: 9999px !important;
+    }
+    .progress-bar-debt {
+        background-color: #ef4444 !important;
+        height: 8px !important;
+        border-radius: 9999px !important;
+    }
+    
+    /* Section Headers */
+    .section-header {
+        display: flex !important;
+        align-items: center !important;
+        gap: 8px !important;
+        margin-bottom: 20px !important;
+        color: #1e293b !important;
+        font-weight: 700 !important;
+        font-size: 1.125rem !important;
+    }
+    
+    /* Table Styling */
+    .custom-table {
+        width: 100% !important;
+        border-collapse: collapse !important;
+        background-color: white !important;
+    }
+    .custom-table th {
+        background-color: #f8fafc !important;
+        color: #64748b !important;
+        text-transform: uppercase !important;
+        font-size: 0.75rem !important;
+        letter-spacing: 0.05em !important;
+        padding: 12px !important;
+        text-align: left !important;
+        border-bottom: 2px solid #e2e8f0 !important;
+    }
+    .custom-table td {
+        padding: 12px !important;
+        border-bottom: 1px solid #f1f5f9 !important;
+        font-size: 0.875rem !important;
+        color: #334155 !important;
+    }
+</style>
+""", unsafe_allow_html=True)
 
 # Error handling wrapper
 try:
@@ -18,48 +105,27 @@ except Exception as e:
     st.stop()
 
 # --- Sidebar Controls ---
-st.sidebar.title("📺 TV Monitor Settings")
-auto_refresh = st.sidebar.checkbox("Auto-Refresh (1m)", value=False, help="Enable automatic page refresh every 60 seconds")
+st.sidebar.title("⚙️ Dashboard Controls")
+auto_refresh = st.sidebar.checkbox("Auto-Refresh (1m)", value=False)
 
 if auto_refresh:
-    # Small hack for auto-refresh in base Streamlit
-    # It will trigger a rerun every 60 seconds
     st.sidebar.caption("Last Update: " + datetime.now().strftime("%H:%M:%S"))
     time.sleep(60)
     st.rerun()
 
 instances = list(db.instance_config.find({"status.active": True}, {"instance_name": 1, "erp.type": 1}))
 instance_options = ["🌍 Global (All Active)"] + [i["instance_name"] for i in instances]
-
 selected_instance_name = st.sidebar.selectbox("Select View", instance_options)
-
-st.title("📊 Debt Collector Monitoring")
 
 # --- Data Fetching Logic ---
 def get_latest_metrics(full_id):
     return db.metrics.find_one({"instance_full_id": full_id}, sort=[("timestamp", -1)])
 
 if selected_instance_name == "🌍 Global (All Active)":
-    # Aggregate Metrics
     total_metrics = {
-        "clients": {
-            "total": 0, 
-            "count_with_open_debt": 0,
-            "count_pre_force_debt_collection": 0,
-            "count_force_debt_collection": 0
-        },
-        "bill": {
-            "total": 0, 
-            "expired": 0, 
-            "count_pre_force_debt_collection": 0,
-            "value_pre_force_debt_collection": 0.0,
-            "count_force_debt_collection": 0,
-            "value_force_debt_collection": 0.0,
-            # Aggregated stats for visualization
-            "bill_stats": {} 
-        },
-        "actions_today": {"dialer_triggers": 0},
-        "cdr_stats": {"total_calls": 0, "average_duration": 0}
+        "clients": {"total": 0, "count_with_open_debt": 0, "count_pre_force_debt_collection": 0, "count_force_debt_collection": 0},
+        "bill": {"total": 0, "expired": 0, "count_pre_force_debt_collection": 0, "value_pre_force_debt_collection": 0.0, "count_force_debt_collection": 0, "value_force_debt_collection": 0.0, "bill_stats": {}},
+        "actions_today": {"dialer_triggers": 0}
     }
     
     for inst in instances:
@@ -67,15 +133,12 @@ if selected_instance_name == "🌍 Global (All Active)":
         m = get_latest_metrics(f_id)
         if m and "data" in m:
             d = m["data"]
-            
-            # Clients
             c = d.get("clients", {})
             total_metrics["clients"]["total"] += c.get("total", 0)
             total_metrics["clients"]["count_with_open_debt"] += c.get("count_with_open_debt", 0)
             total_metrics["clients"]["count_pre_force_debt_collection"] += c.get("count_pre_force_debt_collection", 0)
             total_metrics["clients"]["count_force_debt_collection"] += c.get("count_force_debt_collection", 0)
 
-            # Bills
             b = d.get("bill") if "bill" in d else d.get("bills", {})
             total_metrics["bill"]["total"] += b.get("total", 0)
             total_metrics["bill"]["expired"] += b.get("expired", 0)
@@ -84,172 +147,181 @@ if selected_instance_name == "🌍 Global (All Active)":
             total_metrics["bill"]["count_force_debt_collection"] += b.get("count_force_debt_collection", 0)
             total_metrics["bill"]["value_force_debt_collection"] += b.get("value_force_debt_collection", 0.0)
             
-            # Actions & CDR
-            total_metrics["actions_today"]["dialer_triggers"] += d.get("actions_today", {}).get("dialer_triggers", 0)
-            total_metrics["cdr_stats"]["total_calls"] += d.get("cdr_stats", {}).get("total_calls", 0)
+            # Merge bill_stats for Global
+            b_stats = b.get("bill_stats", {})
+            for key in ["tipo_cliente", "bairro"]:
+                if key in b_stats:
+                    if key not in total_metrics["bill"]["bill_stats"]:
+                        total_metrics["bill"]["bill_stats"][key] = {}
+                    for subkey, val in b_stats[key].items():
+                        total_metrics["bill"]["bill_stats"][key][subkey] = total_metrics["bill"]["bill_stats"][key].get(subkey, 0) + val
 
-            # Aggregate Bill Stats (simple merge for visualization)
-            # Note: This is an approximation for global view as we can't easily merge overlapping keys without more logic
-            # For now, we will skip detailed bill_stats for Global View to keep it clean, or just take the logs
+            total_metrics["actions_today"]["dialer_triggers"] += d.get("actions_today", {}).get("dialer_triggers", 0)
     
     data = total_metrics
-    view_title = "Global Performance"
-    metrics_query = {"instance_full_id": {"$in": [f"{i['instance_name']}-{i.get('erp',{}).get('type','ixc')}-{str(i['_id'])}" for i in instances]}}
-
 else:
-    # Single Instance
     inst_doc = next(i for i in instances if i["instance_name"] == selected_instance_name)
     f_id = f"{selected_instance_name}-{inst_doc.get('erp',{}).get('type','ixc')}-{str(inst_doc['_id'])}"
     m = get_latest_metrics(f_id)
     data = m["data"] if m else {}
-    # Handle bills/bill key transition
     if "bill" not in data and "bills" in data:
         data["bill"] = data["bills"]
-    view_title = f"{selected_instance_name} Status"
-    metrics_query = {"instance_full_id": f_id}
 
-# --- KPI Section ---
-st.subheader(f"✨ {view_title}")
-col1, col2, col3, col4 = st.columns(4)
+# --- Layout: Header ---
+col_h1, col_h2 = st.columns([8, 2])
+with col_h1:
+    st.markdown("### ⊞ Collection")
+    st.markdown("<p style='color: #64748b; margin-top: -15px;'>Real-time insights into clients and billing status</p>", unsafe_allow_html=True)
+with col_h2:
+    st.markdown("<div style='display: flex; gap: 8px; justify-content: flex-end;'>", unsafe_allow_html=True)
+    st.button("⊞ Filter", type="secondary")
+    st.button("📥 Export Report", type="primary")
+    st.markdown("</div>", unsafe_allow_html=True)
 
-with col1:
-    st.metric("Clients in Debt", data.get("clients", {}).get("count_with_open_debt", 0))
+st.markdown("<br>", unsafe_allow_html=True)
+
+# --- Layout: Clients ---
+with st.container():
+    st.markdown("<div class='section-header'>👤 Clients <span style='margin-left: auto; font-size: 0.75rem; background: #dbeafe; color: #1e40af; padding: 2px 8px; border-radius: 4px;'>Updated Today</span></div>", unsafe_allow_html=True)
     
-    c_pre = data.get("clients", {}).get("count_pre_force_debt_collection", 0)
-    c_force = data.get("clients", {}).get("count_force_debt_collection", 0)
-    st.caption(f"Pre-Force: {c_pre} | Force: {c_force}")
-
-with col2:
-    st.metric("Expired Bills", data.get("bill", {}).get("expired", 0))
-    st.caption(f"Total Bills: {data.get('bill', {}).get('total', 0)}")
-
-with col3:
-    # Calculate Total Debt Value from Pre+Force
-    val_pre = data.get("bill", {}).get("value_pre_force_debt_collection", 0.0)
-    val_force = data.get("bill", {}).get("value_force_debt_collection", 0.0)
-    total_val = val_pre + val_force
+    c_col1, c_col2, c_col3 = st.columns([1, 1, 1])
     
-    st.metric("Total Debt Value", f"R$ {total_val:,.2f}")
-    st.caption(f"Pre: R$ {val_pre:,.2f} | Force: R$ {val_force:,.2f}")
-
-with col4:
-    st.metric("Triggers Today", data.get("actions_today", {}).get("dialer_triggers", 0))
-    st.caption(f"CDR Count: {data.get('cdr_stats', {}).get('total_calls', 0)}")
-
-# --- Charts & Activity ---
-st.divider()
-
-# Create tabs for different visualizations
-tab_trends, tab_stats, tab_logs = st.tabs(["📈 Trends", "🏙️ Neighborhoods", "⚡ Activity Log"])
-
-with tab_trends:
-    st.subheader("Financial Evolution")
-    # Fetch recent history
-    hist = list(db.metrics.find(metrics_query).sort("timestamp", -1).limit(40))
-    
-    if hist:
-        trend_data = []
-        for h in hist:
-            d_hist = h.get("data", {})
-            b_hist = d_hist.get("bill") if "bill" in d_hist else d_hist.get("bills", {})
-            
-            trend_data.append({
-                "Time": h["timestamp"],
-                "Pre-Force Value": b_hist.get("value_pre_force_debt_collection", 0),
-                "Force Value": b_hist.get("value_force_debt_collection", 0)
-            })
-            
-        df_hist = pd.DataFrame(trend_data)
+    with c_col1:
+        st.markdown(f"""
+        <div class='kpi-label'>Active Total <span class='kpi-trend trend-up'>📈 +2.4%</span></div>
+        <div class='kpi-value'>{data.get('clients', {}).get('total', 0):,}</div>
+        """, unsafe_allow_html=True)
         
-        if not df_hist.empty:
-            fig = px.area(
-                df_hist, 
-                x="Time", 
-                y=["Pre-Force Value", "Force Value"],
-                color_discrete_map={"Pre-Force Value": "#fb8500", "Force Value": "#d00000"},
-                template="plotly_dark"
-            )
-            st.plotly_chart(fig, use_container_width=True)
-        else:
-            st.info("No numeric data available for trends.")
-    else:
-        st.info("Insufficient history for trends.")
-
-with tab_stats:
-    if selected_instance_name == "🌍 Global (All Active)":
-        st.warning("Neighborhood statistics are only available for single instance view.")
-    else:
-        st.subheader("Top Neighborhoods by Debt (Bills Count)")
+    with c_col2:
+        on_debt = data.get('clients', {}).get('count_with_open_debt', 0)
+        total_c = data.get('clients', {}).get('total', 1)
+        pct_debt = (on_debt / total_c) * 100
+        st.markdown(f"""
+        <div style='background: #fef2f2; padding: 20px; border-radius: 12px; height: 100%; border: 1px solid #fee2e2;'>
+            <div class='kpi-label' style='color: #ef4444;'>On Debt <span style='float: right; background: #fee2e2; padding: 2px 6px; border-radius: 4px;'>{pct_debt:.1f}%</span></div>
+            <div class='kpi-value' style='color: #ef4444;'>{on_debt:,}</div>
+        </div>
+        """, unsafe_allow_html=True)
         
-        bill_stats = data.get("bill", {}).get("bill_stats", {})
-        bairro_stats = bill_stats.get("bairro", {})
+    with c_col3:
+        pre_debt = data.get('clients', {}).get('count_pre_force_debt_collection', 0)
+        debt_coll = data.get('clients', {}).get('count_force_debt_collection', 0)
         
-        if bairro_stats:
-            # Convert dict to df
-            df_bairro = pd.DataFrame(list(bairro_stats.items()), columns=["Neighborhood", "Bills"])
-            df_bairro = df_bairro.sort_values("Bills", ascending=False).head(10)
-            
-            fig_bar = px.bar(
-                df_bairro, 
-                x="Bills", 
-                y="Neighborhood", 
-                orientation='h',
-                color="Bills",
-                template="plotly_dark"
-            )
-            fig_bar.update_layout(yaxis={'categoryorder':'total ascending'})
-            st.plotly_chart(fig_bar, use_container_width=True)
-        else:
-            st.info("No neighborhood statistics available.")
+        st.markdown(f"""
+        <div style='margin-bottom: 20px;'>
+            <div style='display: flex; justify-content: space-between; font-size: 0.875rem; font-weight: 600;'>
+                <span>Pre-Debt Collector</span>
+                <span>{pre_debt}</span>
+            </div>
+            <div class='progress-container'><div class='progress-bar-pre' style='width: {min(100, (pre_debt/max(1, on_debt))*100)}%'></div></div>
+        </div>
+        <div>
+            <div style='display: flex; justify-content: space-between; font-size: 0.875rem; font-weight: 600;'>
+                <span>Debt Collector</span>
+                <span>{debt_coll}</span>
+            </div>
+            <div class='progress-container'><div class='progress-bar-debt' style='width: {min(100, (debt_coll/max(1, on_debt))*100)}%'></div></div>
+        </div>
+        """, unsafe_allow_html=True)
 
-with tab_logs:
-    st.subheader("Live Activity (Last 15)")
-    # Fetch recent history_action_log
-    log_query = {}
-    if selected_instance_name != "🌍 Global (All Active)":
-        log_query = {"instance_full_id": f_id}
+st.markdown("<br>", unsafe_allow_html=True)
+
+# --- Layout: Bills Overview ---
+with st.container():
+    st.markdown("<div class='section-header'>🧾 Bills Overview <span style='margin-left: auto; color: #94a3b8;'>...</span></div>", unsafe_allow_html=True)
     
-    recent_logs = list(db.history_action_log.find(log_query).sort("occurred_at", -1).limit(15))
+    b_col1, b_col2 = st.columns([1, 2])
     
-    if recent_logs:
-        for log in recent_logs:
-            col_icon, col_details = st.columns([0.5, 9.5])
-            with col_icon:
-                st.write("📞" if "dialer" in log.get("action", "") else "⚙️")
-            with col_details:
-                time_str = log["occurred_at"].strftime("%H:%M")
-                action_clean = log.get('action').replace('_', ' ').title()
-                st.markdown(f"**{time_str}** - {action_clean}")
-                
-                details = log.get('details', {})
-                msg = details.get('message', '')
-                num = details.get('number', '')
-                if msg or num:
-                    st.caption(f"{msg} {num}")
-            st.divider()
+    with b_col1:
+        st.markdown(f"""
+        <div style='margin-bottom: 24px;'>
+            <div class='kpi-label'>Expired Total</div>
+            <div class='kpi-value'>{data.get('bill', {}).get('expired', 0):,}</div>
+        </div>
+        <div>
+            <div class='kpi-label'>Expired Value</div>
+            <div class='kpi-value'>R$ {data.get('bill', {}).get('value_pre_force_debt_collection', 0) + data.get('bill', {}).get('value_force_debt_collection', 0):,.2f}</div>
+            <div style='color: #94a3b8; font-size: 0.75rem;'>Exact: R$ {data.get('bill', {}).get('value_pre_force_debt_collection', 0) + data.get('bill', {}).get('value_force_debt_collection', 0):,.2f}</div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+    with b_col2:
+        val_pre = data.get('bill', {}).get('value_pre_force_debt_collection', 0)
+        val_force = data.get('bill', {}).get('value_force_debt_collection', 0)
+        cnt_pre = data.get('bill', {}).get('count_pre_force_debt_collection', 0)
+        cnt_force = data.get('bill', {}).get('count_force_debt_collection', 0)
+        
+        st.markdown(f"""
+        <table class='custom-table' style='width: 100%; border-collapse: collapse;'>
+            <thead>
+                <tr>
+                    <th>Stage</th>
+                    <th>Count</th>
+                    <th>Value</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><span style='color: #f59e0b;'>●</span> Pre-Debt Collection</td>
+                    <td>{cnt_pre}</td>
+                    <td>R$ {val_pre:,.2f}</td>
+                </tr>
+                <tr>
+                    <td><span style='color: #ef4444;'>●</span> Debt Collector</td>
+                    <td>{cnt_force}</td>
+                    <td>R$ {val_force:,.2f}</td>
+                </tr>
+            </tbody>
+        </table>
+        """, unsafe_allow_html=True)
+
+st.markdown("<br>", unsafe_allow_html=True)
+
+# --- Layout: Charts ---
+c1, c2 = st.columns(2)
+
+with c1:
+    st.markdown("<div class='section-header'>🌐 Tipo Cliente</div>", unsafe_allow_html=True)
+    tipo_stats = data.get('bill', {}).get('bill_stats', {}).get('tipo_cliente', {})
+    if tipo_stats:
+        df_tipo = pd.DataFrame(list(tipo_stats.items()), columns=['Tipo', 'Count'])
+        df_tipo = df_tipo.sort_values('Count', ascending=False).head(8)  # Top 8
+        fig = px.pie(df_tipo, values='Count', names='Tipo', hole=0.7, 
+                     template="plotly_white",
+                     color_discrete_sequence=px.colors.qualitative.Pastel)
+        fig.update_layout(
+            showlegend=True, 
+            margin=dict(t=0, b=0, l=0, r=0), 
+            height=300,
+            paper_bgcolor='white',
+            plot_bgcolor='white',
+            legend=dict(orientation="v", yanchor="middle", y=0.5, xanchor="right", x=1.2, font=dict(color="#0f172a")),
+            font=dict(color="#0f172a")
+        )
+        fig.add_annotation(text="100%", x=0.5, y=0.5, font_size=20, showarrow=False, font_color="#1e293b")
+        st.plotly_chart(fig, width="stretch")
     else:
-        st.write("No recent activity found.")
+        st.info("No data available")
 
-st.sidebar.divider()
-
-# Export Options
-st.sidebar.subheader("📥 Export Options")
-if st.sidebar.button("Export Current View as CSV", use_container_width=True):
-    try:
-        # Export the trend data if available
-        if 'df_hist' in locals() and not df_hist.empty:
-            csv = df_hist.to_csv(index=False)
-            st.sidebar.download_button(
-                label="Download CSV",
-                data=csv,
-                file_name=f"metrics_{selected_instance_name}_{datetime.now().strftime('%Y%m%d')}.csv",
-                mime="text/csv",
-                use_container_width=True
-            )
-        else:
-            st.sidebar.warning("No data available to export")
-    except Exception as e:
-        st.sidebar.error(f"Export failed: {e}")
-
-st.sidebar.write("Developed for TV monitoring. High contrast enabled.")
-st.sidebar.caption(f"Page loaded: {datetime.now().strftime('%H:%M:%S')}")
+with c2:
+    st.markdown("<div class='section-header'>🗺️ Bairro (Neighborhood)</div>", unsafe_allow_html=True)
+    bairro_stats = data.get('bill', {}).get('bill_stats', {}).get('bairro', {})
+    if bairro_stats:
+        df_bairro = pd.DataFrame(list(bairro_stats.items()), columns=['Bairro', 'Count'])
+        df_bairro = df_bairro.sort_values('Count', ascending=False).head(8)  # Top 8
+        fig = px.pie(df_bairro, values='Count', names='Bairro', hole=0.7,
+                     template="plotly_white",
+                     color_discrete_sequence=px.colors.qualitative.Safe)
+        fig.update_layout(
+            showlegend=True, 
+            margin=dict(t=0, b=0, l=0, r=0), 
+            height=300,
+            paper_bgcolor='white',
+            plot_bgcolor='white',
+            legend=dict(orientation="v", yanchor="middle", y=0.5, xanchor="right", x=1.2, font=dict(color="#0f172a")),
+            font=dict(color="#0f172a")
+        )
+        fig.add_annotation(text="🏙️", x=0.5, y=0.5, font_size=24, showarrow=False, font_color="#1e293b")
+        st.plotly_chart(fig, width="stretch")
+    else:
+        st.info("No data available")

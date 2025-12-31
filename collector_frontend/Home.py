@@ -1,6 +1,7 @@
 import streamlit as st
 from db import get_db
 from utils import test_mongo_connection, format_datetime
+from utils_css import apply_light_theme
 import os
 
 st.set_page_config(
@@ -8,6 +9,9 @@ st.set_page_config(
     page_icon="🤖",
     layout="wide"
 )
+
+# Apply light theme
+apply_light_theme()
 
 st.title("🤖 Debt Collector Control Center")
 
