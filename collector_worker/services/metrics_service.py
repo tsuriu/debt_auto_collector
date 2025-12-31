@@ -158,17 +158,16 @@ class MetricsService:
                 
                 # Special Logic for 'tipo_cliente' (Client Type Name) - Same Normalization Pattern
                 elif key == "tipo_cliente":
-                    # 1. Fetch Reverse Map (Tipo Cliente)
-                    
-                    instance_map = self.instance.get('erp', {}).get('reverse_map', {}).get('tipo_cliente', {})
-                    lookup_map = {}
-                    
-                    # Consolidate lookup
-                    for correct, variants in instance_map.items():
-                         if isinstance(variants, list):
-                             for v in variants:
-                                 if v:
-                                     lookup_map[v.lower().strip()] = correct
+                    # 1. Fetch Client Types from DB for mapping
+                    client_types_cursor = self.db.client_types.find({"instance_full_id": self.instance_full_id})
+                    type_lookup = {}
+                    for ct in client_types_cursor:
+                        ct_id = ct.get('id')
+                        ct_name = ct.get('tipo_cliente')
+                        if ct_id is not None:
+                            type_lookup[str(ct_id)] = ct_name
+                        if ct_name:
+                            type_lookup[ct_name.lower().strip()] = ct_name
                     
                     # 2. Consolidate Results
                     consolidated = {}
@@ -177,13 +176,12 @@ class MetricsService:
                         count = item.get("count", 0)
                 
                         if not raw_name:
-                            logger.debug(f"item: {item}")
                             final_name = "Indefinido"
                         else:
-                            # Processor logic tries to map ID to Name. So raw_name should be Name (str) or ID (str/int).
-                            # Normalization applies to Names.
+                            # Normalize and lookup
                             norm_name = str(raw_name).lower().strip()
-                            final_name = lookup_map.get(norm_name, str(raw_name).strip().title())
+                            # Try to find name in lookup (by ID or exact name)
+                            final_name = type_lookup.get(norm_name, str(raw_name).strip().title())
                         
                         consolidated[final_name] = consolidated.get(final_name, 0) + count
                     
