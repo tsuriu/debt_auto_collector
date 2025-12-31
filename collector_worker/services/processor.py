@@ -80,6 +80,7 @@ class Processor:
                 "participa_pre_cobranca": client.get('participa_pre_cobranca'),
                 "ativo": client.get('ativo'),
                 "tipo_pessoa": self._get_tipo_pessoa(client),
+                "id_tipo_cliente": self._to_int(client.get('id_tipo_cliente')),
                 "data_ultima_alteracao": datetime.now()
             })
         return processed
@@ -195,6 +196,7 @@ class Processor:
                 "ativo": client.get('ativo', ''),
                 "participa_pre_cobranca": client.get('participa_pre_cobranca', ''),
                 "tipo_pessoa": client.get('tipo_pessoa') or client.get('pessoa') or '',
+                "id_tipo_cliente": client.get('id_tipo_cliente'),
             })
             
             # Unique ID
