@@ -134,22 +134,22 @@ class Processor:
                 
         return processed
 
-    def merge_data(self, bills, clients, condominiums=None):
+    def merge_data(self, bills, clients, client_types=None):
         # Index clients by ID for fast lookup
         # Ensure ID keys are strings for matching if clients came from DB (where they might depend on how they were stored)
         # But we just enforced ints in process_clients.
         # If 'clients' comes from MongoDB find(), and we stored them as Int, they are Int.
         client_map = {str(c['id']): c for c in clients}
         
-        # Index condominiums by ID
-        condo_map = {}
-        if condominiums:
-            for c in condominiums:
+        # Index client types by ID
+        type_map = {}
+        if client_types:
+            for t in client_types:
                 # Ensure we map from INT (as stored) or match types
-                cid = c.get('id')
-                name = c.get('condominio')
-                if cid and name:
-                    condo_map[cid] = name
+                tid = t.get('id')
+                name = t.get('tipo_cliente')
+                if tid and name:
+                    type_map[tid] = name
 
         merged_charges = []
         
@@ -180,9 +180,9 @@ class Processor:
 
             # Additional keys from client
             merged_bill = bill.copy()
-            # Resolve Condominium Name
-            condo_id = client.get('id_condominio')
-            condo_name = condo_map.get(condo_id, condo_id) if condo_id else ''
+            # Resolve Client Type Name
+            type_id = client.get('id_tipo_cliente')
+            type_name = type_map.get(type_id, type_id) if type_id else ''
 
             merged_bill.update({
                 "telefone_celular": client.get('telefone_celular', ''),
@@ -192,11 +192,10 @@ class Processor:
                 "fantasia": client.get('fantasia', ''),
                 "bairro": client.get('bairro', ''),
                 "endereco": client.get('endereco', ''),
-                "id_condominio": condo_name, # Mapped to name as requested
+                "tipo_cliente": type_name, # Mapped to name
                 "ativo": client.get('ativo', ''),
                 "participa_pre_cobranca": client.get('participa_pre_cobranca', ''),
                 "tipo_pessoa": client.get('tipo_pessoa') or client.get('pessoa') or '',
-                "id_tipo_cliente": client.get('id_tipo_cliente'),
             })
             
             # Unique ID
@@ -216,15 +215,14 @@ class Processor:
             
         return merged_charges
 
-    def process_condominiums(self, raw_condos):
+    def process_client_types(self, raw_types):
         processed = []
-        for condo in raw_condos:
+        for t in raw_types:
             try:
                 processed.append({
-                    "id": self._to_int(condo.get('id')),
-                    "condominio": condo.get('condominio'),
-                    "ultimo_update": datetime.now()
+                    "id": self._to_int(t.get('id')),
+                    "tipo_cliente": t.get('tipo_cliente')
                 })
             except Exception as e:
-                logger.warning(f"Skipping invalid condominium: {e}")
+                logger.warning(f"Skipping invalid client type: {e}")
         return processed

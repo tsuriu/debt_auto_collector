@@ -95,7 +95,7 @@ class MetricsService:
 
             # Bill Stats - Aggregated by specific keys
             bill_stats_result = {}
-            target_keys = ["id_condominio", "bairro", "instance_name", "expired_age", "erp_type"]
+            target_keys = ["tipo_cliente", "bairro", "instance_name", "expired_age", "erp_type"]
             
             for key in target_keys:
                 # Map key to valid mongo field if needed. 
@@ -105,10 +105,6 @@ class MetricsService:
                 # Use '$' prefix for field reference in $group
                 # If key is nested, adjust. For now assume flat or top level.
                 field_ref = f"${key}"
-                if key == "erp_type":
-                     # In some docs it might be flat, in others nested? 
-                     # Processor adds 'erp_type' at root level.
-                     pass 
                 
                 pipeline_key = [
                     {"$match": {"instance_full_id": self.instance_full_id}},
@@ -133,9 +129,9 @@ class MetricsService:
                     def populate_lookup(source_map):
                         for correct, variants in source_map.items():
                              if isinstance(variants, list):
-                                 for v in variants:
-                                     if v:
-                                         lookup_map[v.lower().strip()] = correct
+                                  for v in variants:
+                                      if v:
+                                          lookup_map[v.lower().strip()] = correct
                     
                     # Populate Default first
                     populate_lookup(default_map)
@@ -160,13 +156,11 @@ class MetricsService:
                     # 3. Assign Dictionary directly (Format: {Name: Count})
                     bill_stats_result[key] = consolidated
                 
-                # Special Logic for 'id_condominio' (Condo Name) - Same Normalization Pattern
-                elif key == "id_condominio":
-                    # 1. Fetch Reverse Map (Condominium)
-                    # No default map for condos currently hardcoded (or check if needed), assume DB only for now or empty default.
-                    # Or keep consistent structure.
+                # Special Logic for 'tipo_cliente' (Client Type Name) - Same Normalization Pattern
+                elif key == "tipo_cliente":
+                    # 1. Fetch Reverse Map (Tipo Cliente)
                     
-                    instance_map = self.instance.get('erp', {}).get('reverse_map', {}).get('condominium', {})
+                    instance_map = self.instance.get('erp', {}).get('reverse_map', {}).get('tipo_cliente', {})
                     lookup_map = {}
                     
                     # Consolidate lookup
@@ -185,12 +179,11 @@ class MetricsService:
                         if not raw_name:
                             final_name = "Indefinido"
                         else:
-                            # If it's an ID (digits), handle? 
                             # Processor logic tries to map ID to Name. So raw_name should be Name (str) or ID (str/int).
                             # Normalization applies to Names.
                             norm_name = str(raw_name).lower().strip()
                             final_name = lookup_map.get(norm_name, str(raw_name).strip().title())
-
+                        
                         consolidated[final_name] = consolidated.get(final_name, 0) + count
                     
                     # 3. Assign Dictionary

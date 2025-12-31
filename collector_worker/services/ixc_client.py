@@ -114,12 +114,12 @@ class IxcClient:
         }
         return self.fetch_all("fn_areceber", query_params)
 
-    def get_condominium(self):
+    def get_client_types(self):
         query_params = {
-            "qtype": "cliente_condominio.id",
+            "qtype": "tipo_cliente.id",
             "query": "1",
             "oper": ">=",
-            "sortname": "cliente_condominio.id",
+            "sortname": "tipo_cliente.id",
             "sortorder": "desc"
         }
-        return self.fetch_all("cliente_condominio", query_params)
+        return self.fetch_all("tipo_cliente", query_params)

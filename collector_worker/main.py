@@ -151,11 +151,11 @@ def run_bills_update_job():
             if not instance_clients:
                 logger.warning(f"No clients found in 'clients' collection for {instance_full_id}. Skipping merge.")
             
-            # Fetch Condominiums for mapping
-            instance_condos = list(db.condominium.find({"instance_full_id": instance_full_id}))
+            # Fetch Client Types for mapping
+            instance_client_types = list(db.client_types.find({"instance_full_id": instance_full_id}))
 
             # Merge / Create Charges
-            charges = processor.merge_data(processed_bills, instance_clients, condominiums=instance_condos)
+            charges = processor.merge_data(processed_bills, instance_clients, client_types=instance_client_types)
             
             upserted_count = 0
             modified_count = 0
@@ -393,56 +393,61 @@ def run_metrics_job():
         except Exception as e:
             logger.error(f"Error in Metrics Job for {instance.get('instance_name')}: {e}")
 
-def run_condominium_update_job():
-    logger.info("Starting Job: CONDOMINIUM UPDATE")
+def run_client_types_update_job():
+    logger.info("Starting Job: CLIENT TYPES UPDATE")
     instances = get_active_instances()
     
     for instance in instances:
         try:
             instance_full_id = _get_instance_full_id(instance)
-            logger.info(f"Processing condominiums for instance: {instance.get('instance_name')}")
+            logger.info(f"Processing client types for instance: {instance.get('instance_name')}")
             
             client = IxcClient(instance)
             processor = Processor(instance)
             db = Database().get_db()
+
+            # Cleanup: Drop old condominium collection if it exists
+            if "condominium" in db.list_collection_names():
+                db.condominium.drop()
+                logger.info("Dropped legacy 'condominium' collection")
             
             # Fetch
-            raw_condos = client.get_condominium()
-            logger.info(f"Fetched {len(raw_condos)} condominiums")
+            raw_types = client.get_client_types()
+            logger.info(f"Fetched {len(raw_types)} client types")
             
             # Process
-            processed_condos = processor.process_condominiums(raw_condos)
+            processed_types = processor.process_client_types(raw_types)
             
-            if processed_condos:
+            if processed_types:
                 from pymongo import UpdateOne
                 ops = []
-                for c in processed_condos:
-                    c['instance_full_id'] = instance_full_id
+                for t in processed_types:
+                    t['instance_full_id'] = instance_full_id
                     ops.append(
                         UpdateOne(
-                            {"instance_full_id": instance_full_id, "id": c['id']},
-                            {"$set": c},
+                            {"instance_full_id": instance_full_id, "id": t['id']},
+                            {"$set": t},
                             upsert=True
                         )
                     )
                 
                 if ops:
-                    res = db.condominium.bulk_write(ops)
-                    logger.info(f"Saved/Updated {len(ops)} condominiums")
+                    res = db.client_types.bulk_write(ops)
+                    logger.info(f"Saved/Updated {len(ops)} client types")
             
-            # Log Execution (Simplified, no full stats object requirement in spec, but good practice)
+            # Log Execution
             db.history_action_log.insert_one({
                 "instance_full_id": instance_full_id,
-                "action": "job_condominium_execution",
+                "action": "job_client_types_execution",
                 "occurred_at": datetime.now(),
                 "details": {
-                    "fetched": len(raw_condos),
-                    "processed": len(processed_condos)
+                    "fetched": len(raw_types),
+                    "processed": len(processed_types)
                 }
             })
             
         except Exception as e:
-            logger.error(f"Error in Condominium Job for {instance.get('instance_name')}: {e}")
+            logger.error(f"Error in Client Types Job for {instance.get('instance_name')}: {e}")
 
 def main():
     import argparse
@@ -450,7 +455,7 @@ def main():
     parser = argparse.ArgumentParser(description="Debt Collector Service")
     parser.add_argument(
         "--job", 
-        choices=["clients", "bills", "dialer", "reports", "service", "metrics", "condominium"], 
+        choices=["clients", "bills", "dialer", "reports", "service", "metrics", "client_types"], 
         default="service",
         help="Run a specific job manually (once) or start the long-running service (default)"
     )
@@ -518,8 +523,8 @@ def main():
         run_metrics_job()
         return
 
-    if args.job == "condominium":
-        run_condominium_update_job()
+    if args.job == "client_types":
+        run_client_types_update_job()
         return
 
 
@@ -536,8 +541,8 @@ def main():
         # Metrics: every 6 hours
         schedule.every(30).minutes.do(run_metrics_job)
         
-        # Condominium: Once a week (Monday 6:00 AM)
-        schedule.every().monday.at("06:00").do(run_condominium_update_job)
+        # Client Types: Once a week (Monday 6:00 AM)
+        schedule.every().monday.at("06:00").do(run_client_types_update_job)
 
         # Dialer: every 20 minutes between 8-18 (handled by check_window inside job)
         schedule.every(20).minutes.do(run_dialer_job)

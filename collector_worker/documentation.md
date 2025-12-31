@@ -7,7 +7,7 @@ The `collector_worker` is a Python-based service designed to automate debt colle
 ## Architecture
 
 The system operates as a daemon or single-run job, connecting to:
-1.  **MongoDB**: For data storage (`clients`, `bills`, `history_action_log`, `last_reports`, `metrics`, `condominium`).
+1.  **MongoDB**: For data storage (`clients`, `bills`, `history_action_log`, `last_reports`, `metrics`, `client_types`).
 2.  **IXC ERP**: Fetches client and billing data via API.
 3.  **Asterisk/Issabel**: Triggers calls via ARI (Asterisk REST Interface) and fetches CDRs (Call Detail Records).
 
@@ -47,7 +47,7 @@ The Service runs on a schedule defined in `main.py`.
 
 ### 1. Clients Update (`run_clients_update_job`)
 **Schedule**: Daily at 07:00
-1.  **Fetch**: Retrieves active clients from IXC (Status: Active, Type: NOT Juridical/Condominium).
+1.  **Fetch**: Retrieves active clients from IXC (Status: Active).
 2.  **Process**: Validates and formats client data (normalize fields).
 3.  **Upsert**: Updates the `clients` collection in MongoDB.
 4.  **Sync**: Removes clients from MongoDB that are no longer present in the source fetch.
@@ -101,15 +101,15 @@ The Service runs on a schedule defined in `main.py`.
 2.  **Aggregate Bills**: 
     *   Total and Expired counts.
     *   **Classification**: Counts and Total Value for `pre_force_debt_collection` and `force_debt_collection`.
-    *   **Bill Stats**: Aggregates counts individually by key. `bairro` and `id_condominio` are returned as dictionaries `{Name: Count}` after normalization. Other keys return a list of objects.
-    *   **Normalization**: Uses `instance.erp.reverse_map.neighborhood` and `instance.erp.reverse_map.condominium` to normalize names (e.g., merging synonyms) before aggregation.
+    *   **Bill Stats**: Aggregates counts individually by key. `bairro` and `tipo_cliente` are returned as dictionaries `{Name: Count}` after normalization. Other keys return a list of objects.
+    *   **Normalization**: Uses `instance.erp.reverse_map.neighborhood` and `instance.erp.reverse_map.tipo_cliente` to normalize names (e.g., merging synonyms) before aggregation.
 3.  **Action Logs**: Counts total dialer actions triggered for the current day.
 4.  **CDR Analytics**: Fetches the latest report from `last_reports` to compute disposition distribution and average call duration.
-6.  **Condominium Update (`run_condominium_update_job`)**
+6.  **Client Types Update (`run_client_types_update_job`)**
 **Schedule**: Weekly (Mondays at 06:00)
-1.  **Fetch**: Retrieves Condominium list from IXC.
+1.  **Fetch**: Retrieves Client Types list from IXC.
 2.  **Process**: Formats data.
-3.  **Upsert**: Updates `condominium` collection in MongoDB.
+3.  **Upsert**: Updates `client_types` collection in MongoDB.
 4.  **Log**: Records count of fetched and processed items to `history_action_log`.
 
 ## Services Breakdown
@@ -126,7 +126,7 @@ The Service runs on a schedule defined in `main.py`.
 *   **Key Methods**:
     *   `process_clients()`: Formats client dictionary.
     *   `process_bills()`: Calculates aging and due dates.
-    *   `merge_data()`: Combines Bill + Client + Condominium data. Resolves `id_condominio` to Name.
+    *   `merge_data()`: Combines Bill + Client + Client Type data. Resolves `id_tipo_cliente` to Name.
 
 ### `dialer.py`
 *   **Purpose**: Logic for determining WHO to call and HOW.

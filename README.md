@@ -43,10 +43,10 @@ A Python application that replicates the logic of the "Debt Collector" Node-RED 
    # Run only the Dialer job
    python3 collector_worker/main.py --job dialer
 
-   # Run Condominium Update Job
-   python3 collector_worker/main.py --job condominium
-
-   # Available jobs: clients, bills, dialer, reports, metrics, condominium, service (default)
+   # Run Client Types Update Job
+   python3 collector_worker/main.py --job client_types
+ 
+   # Available jobs: clients, bills, dialer, reports, metrics, client_types, service (default)
 
    # Skip Database Verification
    python3 collector_worker/main.py --no-verify-db
@@ -77,4 +77,4 @@ A Python application that replicates the logic of the "Debt Collector" Node-RED 
 - **Self-Healing DB**: Automatically verifies and fixes database indices and collections on startup.
 - **Data Metrics**: Generates periodic snapshots of debt state, client health, and dialer performance.
 - **Debt Classification**: Automatically segregates debts into `pre_force` and `force` collection rules based on aging.
-- **Granular Analytics**: Aggregates bill statistics by field. Includes **reverse-mapping normalization** for neighborhoods and condominiums.
+- **Granular Analytics**: Aggregates bill statistics by field. Includes **reverse-mapping normalization** for neighborhoods and client types.

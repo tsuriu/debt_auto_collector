@@ -34,7 +34,7 @@ class Database:
 
     def ensure_collections(self):
         """Ensures all required collections exist."""
-        required = ["clients", "bills", "history_action_log", "last_reports", "data_reference", "instance_config", "metrics", "condominium"]
+        required = ["clients", "bills", "history_action_log", "last_reports", "data_reference", "instance_config", "metrics", "client_types"]
         existing = self.get_collections()
         created = []
         
@@ -55,8 +55,8 @@ class Database:
             # Clients
             self.db.clients.create_index([("instance_full_id", 1), ("id", 1)], unique=True)
             
-            # Condominiums
-            self.db.condominium.create_index([("instance_full_id", 1), ("id", 1)], unique=True)
+            # Client Types
+            self.db.client_types.create_index([("instance_full_id", 1), ("id", 1)], unique=True)
             
             # Bills
             self.db.bills.create_index("full_id", unique=True)
