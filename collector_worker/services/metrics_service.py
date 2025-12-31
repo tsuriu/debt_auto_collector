@@ -177,6 +177,7 @@ class MetricsService:
                         count = item.get("count", 0)
                 
                         if not raw_name:
+                            logger.debug(f"item: {item}")
                             final_name = "Indefinido"
                         else:
                             # Processor logic tries to map ID to Name. So raw_name should be Name (str) or ID (str/int).

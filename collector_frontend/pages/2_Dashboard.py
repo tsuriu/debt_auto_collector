@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
+from streamlit_echarts import st_echarts
 from db import get_db
 from datetime import datetime, timedelta
 import time
@@ -207,22 +208,69 @@ with st.container():
         pre_debt = data.get('clients', {}).get('count_pre_force_debt_collection', 0)
         debt_coll = data.get('clients', {}).get('count_force_debt_collection', 0)
         
-        st.markdown(f"""
-        <div style='margin-bottom: 20px;'>
-            <div style='display: flex; justify-content: space-between; font-size: 0.875rem; font-weight: 600;'>
-                <span>Pre-Debt Collector</span>
-                <span>{pre_debt}</span>
-            </div>
-            <div class='progress-container'><div class='progress-bar-pre' style='width: {min(100, (pre_debt/max(1, on_debt))*100)}%'></div></div>
-        </div>
-        <div>
-            <div style='display: flex; justify-content: space-between; font-size: 0.875rem; font-weight: 600;'>
-                <span>Debt Collector</span>
-                <span>{debt_coll}</span>
-            </div>
-            <div class='progress-container'><div class='progress-bar-debt' style='width: {min(100, (debt_coll/max(1, on_debt))*100)}%'></div></div>
+        # ECharts Stacked Horizontal Bar
+        options = {
+            "tooltip": {
+                "trigger": "axis",
+                "axisPointer": {"type": "shadow"}
+            },
+            "grid": {
+                "left": 0,
+                "right": 0,
+                "top": 10,
+                "bottom": 0,
+                "containLabel": True
+            },
+            "xAxis": {
+                "type": "value",
+                "show": False
+            },
+            "yAxis": {
+                "type": "category",
+                "data": ["Clients"],
+                "show": False
+            },
+            "series": [
+                {
+                    "name": "Pre-Debt Collector",
+                    "type": "bar",
+                    "stack": "total",
+                    "label": {
+                        "show": True,
+                        "position": "inside",
+                        "formatter": f"{pre_debt}",
+                        "color": "#fff",
+                        "fontSize": 14,
+                        "fontWeight": "bold"
+                    },
+                    "itemStyle": {"color": "#f59e0b"},
+                    "data": [pre_debt]
+                },
+                {
+                    "name": "Debt Collector",
+                    "type": "bar",
+                    "stack": "total",
+                    "label": {
+                        "show": True,
+                        "position": "inside",
+                        "formatter": f"{debt_coll}",
+                        "color": "#fff",
+                        "fontSize": 14,
+                        "fontWeight": "bold"
+                    },
+                    "itemStyle": {"color": "#ef4444"},
+                    "data": [debt_coll]
+                }
+            ]
+        }
+        
+        st.markdown("""
+        <div style='font-size: 0.75rem; font-weight: 600; margin-bottom: 8px;'>
+            <span style='color: #f59e0b;'>●</span> Pre-Debt Collector &nbsp;
+            <span style='color: #ef4444;'>●</span> Debt Collector
         </div>
         """, unsafe_allow_html=True)
+        st_echarts(options=options, height="80px")
 
 st.markdown("<br>", unsafe_allow_html=True)
 
@@ -286,20 +334,39 @@ with c1:
     if tipo_stats:
         df_tipo = pd.DataFrame(list(tipo_stats.items()), columns=['Tipo', 'Count'])
         df_tipo = df_tipo.sort_values('Count', ascending=False).head(8)  # Top 8
-        fig = px.pie(df_tipo, values='Count', names='Tipo', hole=0.7, 
-                     template="plotly_white",
-                     color_discrete_sequence=px.colors.qualitative.Pastel)
-        fig.update_layout(
-            showlegend=True, 
-            margin=dict(t=0, b=0, l=0, r=0), 
-            height=300,
-            paper_bgcolor='white',
-            plot_bgcolor='white',
-            legend=dict(orientation="v", yanchor="middle", y=0.5, xanchor="right", x=1.2, font=dict(color="#0f172a")),
-            font=dict(color="#0f172a")
-        )
-        fig.add_annotation(text="100%", x=0.5, y=0.5, font_size=20, showarrow=False, font_color="#1e293b")
-        st.plotly_chart(fig, width="stretch")
+        
+        # Calculate total for percentages
+        total = df_tipo['Count'].sum()
+        
+        # Prepare data for Nightingale Rose
+        chart_data = []
+        for _, row in df_tipo.iterrows():
+            pct = (row['Count'] / total) * 100
+            chart_data.append({
+                "value": row['Count'],
+                "name": f"{row['Tipo']}: {row['Count']} ({pct:.1f}%)"
+            })
+        
+        options = {
+            "tooltip": {"trigger": "item"},
+            "series": [{
+                "name": "Tipo Cliente",
+                "type": "pie",
+                "radius": ["30%", "70%"],
+                "center": ["50%", "50%"],
+                "roseType": "area",
+                "itemStyle": {
+                    "borderRadius": 8
+                },
+                "label": {
+                    "show": True,
+                    "fontSize": 11,
+                    "color": "#0f172a"
+                },
+                "data": chart_data
+            }]
+        }
+        st_echarts(options=options, height="350px")
     else:
         st.info("No data available")
 
@@ -309,19 +376,38 @@ with c2:
     if bairro_stats:
         df_bairro = pd.DataFrame(list(bairro_stats.items()), columns=['Bairro', 'Count'])
         df_bairro = df_bairro.sort_values('Count', ascending=False).head(8)  # Top 8
-        fig = px.pie(df_bairro, values='Count', names='Bairro', hole=0.7,
-                     template="plotly_white",
-                     color_discrete_sequence=px.colors.qualitative.Safe)
-        fig.update_layout(
-            showlegend=True, 
-            margin=dict(t=0, b=0, l=0, r=0), 
-            height=300,
-            paper_bgcolor='white',
-            plot_bgcolor='white',
-            legend=dict(orientation="v", yanchor="middle", y=0.5, xanchor="right", x=1.2, font=dict(color="#0f172a")),
-            font=dict(color="#0f172a")
-        )
-        fig.add_annotation(text="🏙️", x=0.5, y=0.5, font_size=24, showarrow=False, font_color="#1e293b")
-        st.plotly_chart(fig, width="stretch")
+        
+        # Calculate total for percentages
+        total = df_bairro['Count'].sum()
+        
+        # Prepare data for Nightingale Rose
+        chart_data = []
+        for _, row in df_bairro.iterrows():
+            pct = (row['Count'] / total) * 100
+            chart_data.append({
+                "value": row['Count'],
+                "name": f"{row['Bairro']}: {row['Count']} ({pct:.1f}%)"
+            })
+        
+        options = {
+            "tooltip": {"trigger": "item"},
+            "series": [{
+                "name": "Bairro",
+                "type": "pie",
+                "radius": ["30%", "70%"],
+                "center": ["50%", "50%"],
+                "roseType": "area",
+                "itemStyle": {
+                    "borderRadius": 8
+                },
+                "label": {
+                    "show": True,
+                    "fontSize": 11,
+                    "color": "#0f172a"
+                },
+                "data": chart_data
+            }]
+        }
+        st_echarts(options=options, height="350px")
     else:
         st.info("No data available")
