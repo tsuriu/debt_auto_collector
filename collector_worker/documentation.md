@@ -90,7 +90,8 @@ The Service runs on a schedule defined in `main.py`.
 1.  **Login**: Authenticates with the Asterisk/Issabel web interface.
 2.  **Fetch**: Retrieves Call Detail Records (CDRs) for the current day.
 3.  **Filter**: Keeps only relevant fields (`calldate`, `channel`, `disposition`, `duration`, `uniqueid`).
-4.  **Store**: Upserts individual CDRs into `last_reports` collection using `uniqueid` as key.
+4.  **Override Logic**: Automatically sets `disposition` to `"NO ANSWER"` if `userfield` is `"AMD_MACHINE"`.
+5.  **Store**: Upserts individual CDRs into `last_reports` collection using `uniqueid` as key.
     
 ### 5. Metrics Collection (`run_metrics_job`)
 **Schedule**: Every 30 minutes
@@ -104,7 +105,10 @@ The Service runs on a schedule defined in `main.py`.
     *   **Bill Stats**: Aggregates counts individually by key. `bairro` and `tipo_cliente` are returned as dictionaries `{Name: Count}` after normalization. Other keys return a list of objects.
     *   **Normalization**: Uses `instance.erp.reverse_map.neighborhood` and `instance.erp.reverse_map.tipo_cliente` to normalize names (e.g., merging synonyms) before aggregation.
 3.  **Action Logs**: Counts total dialer actions triggered for the current day.
-4.  **CDR Analytics**: Fetches the latest report from `last_reports` to compute disposition distribution and average call duration.
+4.  **CDR Analytics (`cdr_stats`)**: Uses a MongoDB aggregation pipeline over individual records in `last_reports` for the current day to compute:
+    *   `total_calls`: Total number of CDRs collected today.
+    *   `average_duration`: Mean duration of all calls today.
+    *   `dispositions`: Distribution of call outcomes (e.g., ANSWERED, NO ANSWER).
 6.  **Client Types Update (`run_client_types_update_job`)**
 **Schedule**: Weekly (Mondays at 06:00)
 1.  **Fetch**: Retrieves Client Types list from IXC.
@@ -138,13 +142,13 @@ The Service runs on a schedule defined in `main.py`.
 ### `report_service.py`
 *   **Purpose**: Scrapes/Fetches reporting data from the PBX.
 *   **Key Methods**:
-    *   `fetch_cdr_list()`: Gets daily call list.
+    *   `fetch_cdr_list()`: Gets daily call list and applies machine detection logic.
     *   `fetch_events()`: Gets drill-down details for a call.
 
 ### `metrics_service.py`
 *   **Purpose**: Strategic data snapshots and performance analytics.
 *   **Key Methods**:
-    *   `collect_metrics()`: Orchestrates multiple database aggregations (clients, bills, history, reports) to create a historical data point.
+    *   `collect_metrics()`: Orchestrates multiple database aggregations (clients, bills, history, reports) to create a historical data point. Uses MongoDB aggregation for CDR analytics.
 
 ### `database.py`
 *   **Purpose**: Low-level database operations and schema management.
