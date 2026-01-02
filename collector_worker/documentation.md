@@ -18,6 +18,7 @@ collector_worker/
 ├── config.py               # Configuration and environment variables
 ├── database.py             # MongoDB connection handler
 ├── Dockerfile              # Container definition
+├── requirements.txt        # Worker dependencies
 ├── services/
 │   ├── ixc_client.py       # API Client for IXC ERP
 │   ├── processor.py        # Data processing and business logic

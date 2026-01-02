@@ -50,7 +50,7 @@ The fastest way to run the entire stack is via Docker Compose:
 ## 🛠️ Development
 
 ### Manual Setup
-1. **Install Dependencies**: `pip install -r requirements.txt && pip install -r collector_frontend/requirements.txt`
+1. **Install Dependencies**: `pip install -r collector_worker/requirements.txt && pip install -r collector_frontend/requirements.txt`
 2. **Run Worker**: `python3 collector_worker/main.py`
 3. **Run Frontend**: `streamlit run collector_frontend/Home.py`
 
