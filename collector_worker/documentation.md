@@ -109,6 +109,7 @@ The Service runs on a schedule defined in `main.py`.
     *   `total_calls`: Total number of CDRs collected today.
     *   `average_duration`: Mean duration of all calls today.
     *   `dispositions`: Distribution of call outcomes (e.g., ANSWERED, NO ANSWER).
+    *   **Dashboard Visualization**: These metrics are consumed by the **CDR Overview** section in the frontend, featuring a high-fidelity Stacked Area Chart for disposition trends.
 6.  **Client Types Update (`run_client_types_update_job`)**
 **Schedule**: Weekly (Mondays at 06:00)
 1.  **Fetch**: Retrieves Client Types list from IXC.

@@ -1,80 +1,59 @@
-# Debt Collector Python App
+# Debt Collector Python Ecosystem
 
-A Python application that replicates the logic of the "Debt Collector" Node-RED flow. It automatically fetches client and bill data from IXC Soft ERP, processes debts, and manages an auto-dialer via Asterisk (ARI).
+A professional, high-fidelity ecosystem for automating debt collection. This project replicates and enhances the logic of the "Debt Collector" Node-RED flow, providing a background worker for data synchronization and a Streamlit-based dashboard for real-time monitoring.
 
-## Structure
+## 🏗️ Architecture
 
-- `collector_worker/main.py`: Entry point. Orchestrates the scheduler (Clients, Bills, Reports, Dialer jobs).
-- `services/ixc_client.py`: Handles IXC API communication (Auth, Pagination, Rate Limiting).
-- `services/processor.py`: Business logic for data normalization, due date calculation, and correlating Bills with Clients.
-- `services/report_service.py`: Fetches CDR reports and detailed events from Asterisk/Issabel and stores them in MongoDB.
-- `services/metrics_service.py`: Strategic data snapshots and performance analytics.
-- `services/dialer.py`: Manages call windows, builds queues, and triggers calls.
-- `services/verification.py`: High-level orchestration of DB health checks and Loguru reporting.
-- `database.py`: Low-level MongoDB connection, collection initialization, and index enforcement.
-- `config.py`: Environment configuration and shared settings.
+The project is composed of two main Python components and a database:
 
-## Setup
+- **[Collector Worker](file:///Users/tulioamancio/Scripts/tsuriuTech/debt_auto_collector/collector_worker/documentation.md)**: Background service that orchestrates data syncing (IXC ERP), call triggers (Asterisk ARI), and metrics generation.
+- **[Collector Frontend](file:///Users/tulioamancio/Scripts/tsuriuTech/debt_auto_collector/collector_frontend/documentation.md)**: Interactive Streamlit dashboard for data visualization and instance configuration.
+- **MongoDB**: Centralized storage for clients, bills, metrics, and configurations.
 
-1. **Install Dependencies**:
-   ```bash
-   pip install -r requirements.txt
-   ```
+## 🚀 Quick Start (Docker)
 
-2. **Configuration**:
-   Copy `.env.example` to `.env` and configure your MongoDB URI.
+The fastest way to run the entire stack is via Docker Compose:
+
+1. **Setup Environment**:
    ```bash
    cp .env.example .env
+   # Configure MONGO_URI if not using the internal compose mongo
    ```
-   
-   Ensure your MongoDB has an `instance_config` collection with the active instances (as used in the Node-RED flow).
 
-3. **Run**:
+2. **Launch Ecosystem**:
    ```bash
-   python3 collector_worker/main.py
-   ```
-   
-   **CLI Arguments**:
-   You can run specific jobs manually for debugging or one-off execution:
-   ```bash
-   # Run only the Reports job
-   python3 collector_worker/main.py --job reports --debug
-
-   # Run only the Dialer job
-   python3 collector_worker/main.py --job dialer
-
-   # Run Client Types Update Job
-   python3 collector_worker/main.py --job client_types
- 
-   # Available jobs: clients, bills, dialer, reports, metrics, client_types, service (default)
-
-   # Skip Database Verification
-   python3 collector_worker/main.py --no-verify-db
+   docker compose up -d --build
    ```
 
-## Docker
+3. **Access Services**:
+   - **Dashboard**: `http://localhost:8501`
+   - **MongoDB Control**: `http://localhost:27018` (Mapped port)
 
-1. **Build and Run**:
-   ```bash
-   docker-compose up -d --build
-   ```
-   This will start the application and a MongoDB database.
+## ✨ Key Features
 
-2. **Logs**:
-   ```bash
-   docker-compose logs -f app
-   ```
+### Background Worker (`collector_worker`)
+- **Multi-Instance Support**: Parallel processing of multiple ERP/PABX configurations.
+- **Smart Dialer**: Priority-based call queue with strict daily and hourly frequency limits.
+- **CDR Optimization**: Automatically fetches and optimizes call reports from Asterisk with integrated machine detection (AMD).
+- **Metric Snapshots**: Generates periodic data points for deep historical analysis.
 
-## Features
+### Interactive Dashboard (`collector_frontend`)
+- **Real-time Monitoring**: Comprehensive KPIs for active clients, debt volume, and collection value.
+- **Advanced Visualizations**:
+    - **CDR Overview**: Stacked area charts for call dispositions and performance KPIs.
+    - **Categorized Charts**: Vertical Bar graphs for demographic and debt aging analysis.
+- **Robust Configuration**:
+    - A categorized form-based editor for instance management.
+    - Dropdown support for multiple ERP types (**ixc**, **rbx**, **altarede**).
+    - Integrated **Form/JSON Toggle** for technical configuration flexibility.
 
-- **Multi-Instance Support**: Iterates over all active instances found in the database.
-- **Resilient Scheduler**: Uses `schedule` library to run tasks at specific times or intervals.
-- **Strict Data Integrity**: Enforces unique constraints and performance indices on MongoDB.
-- **Rate Limiting**: Respects IXC API limits (100ms delay).
-- **Graceful Error Handling**: Logs errors without crashing the main loop.
-- **CDR Reports**: Automatically fetches call detail records from Asterisk and optimizes storage. Includes machine detection logic (setting disposition to "NO ANSWER" for "AMD_MACHINE" userfield).
-- **Structured Logging**: Uses `loguru` for beautiful and configurable service logs.
-- **Self-Healing DB**: Automatically verifies and fixes database indices and collections on startup.
-- **Data Metrics**: Generates periodic snapshots of debt state, client health, and dialer performance.
-- **Debt Classification**: Automatically segregates debts into `pre_force` and `force` collection rules based on aging.
-- **Granular Analytics**: Aggregates bill statistics by field. Includes **reverse-mapping normalization** for neighborhoods and client types.
+## 🛠️ Development
+
+### Manual Setup
+1. **Install Dependencies**: `pip install -r requirements.txt && pip install -r collector_frontend/requirements.txt`
+2. **Run Worker**: `python3 collector_worker/main.py`
+3. **Run Frontend**: `streamlit run collector_frontend/Home.py`
+
+## 📄 Documentation
+- Detailed Worker Logic: [collector_worker/documentation.md](file:///Users/tulioamancio/Scripts/tsuriuTech/debt_auto_collector/collector_worker/documentation.md)
+- Detailed Frontend & UI: [collector_frontend/documentation.md](file:///Users/tulioamancio/Scripts/tsuriuTech/debt_auto_collector/collector_frontend/documentation.md)
