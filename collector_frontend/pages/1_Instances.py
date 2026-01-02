@@ -63,89 +63,175 @@ with tab1:
             is_active = inst.get('status', {}).get('active', False)
             
             with st.expander(f"🏢 {inst_name} - {status_badge(is_active)}"):
-                # Create tabs for view and edit
-                view_tab, edit_tab, actions_tab = st.tabs(["👁️ View", "✏️ Edit", "⚙️ Actions"])
-                
-                with view_tab:
-                    st.json(inst)
-                
-                with edit_tab:
+                # View Mode Toggle
+                view_mode = st.radio("View Mode", ["📝 Categorized Form", "{} JSON Editor"], key=f"mode_{inst['_id']}", horizontal=True, label_visibility="collapsed")
+                st.divider()
+
+                if view_mode == "📝 Categorized Form":
                     with st.form(f"edit_form_{inst['_id']}"):
-                        st.write("**Basic Information**")
-                        new_name = st.text_input("Instance Name", value=inst_name)
-                        new_active = st.checkbox("Active", value=is_active)
+                        # --- CATEGORY: General ---
+                        st.markdown("#### ⚙️ General Settings")
+                        g_col1, g_col2 = st.columns(2)
+                        with g_col1:
+                            new_name = st.text_input("Instance Name", value=inst.get('instance_name', ''))
+                        with g_col2:
+                            new_active = st.toggle("Active Instance", value=inst.get('status', {}).get('active', False))
                         
-                        st.write("**ERP Configuration**")
+                        # --- CATEGORY: ERP (IXC) ---
+                        st.markdown("#### 🔌 ERP Configuration")
                         erp = inst.get('erp', {})
-                        new_erp_url = st.text_input("Base URL", value=erp.get('base_url', ''))
-                        new_erp_token = st.text_input("User Token", value=erp.get('auth', {}).get('user_token', ''), type="password")
+                        e_col1, e_col2 = st.columns([3, 1])
+                        with e_col1:
+                            new_erp_url = st.text_input("Base URL", value=erp.get('base_url', ''))
+                        with e_col2:
+                            current_type = erp.get('type', 'ixc')
+                            type_options = ["ixc", "rbx", "altarede"]
+                            # Find index for current value, default to 0
+                            try:
+                                type_idx = type_options.index(current_type)
+                            except ValueError:
+                                type_idx = 0
+                            new_erp_type = st.selectbox("Type", options=type_options, index=type_idx)
                         
-                        st.write("**Asterisk Configuration**")
+                        e_col3, e_col4 = st.columns(2)
+                        with e_col3:
+                            new_erp_token = st.text_input("User Token", value=erp.get('auth', {}).get('user_token', ''), type="password")
+                        with e_col4:
+                            # Convert list to comma-separated string for editing
+                            filial_ids_val = ", ".join(map(str, erp.get('filial_id', [])))
+                            new_filial_ids = st.text_input("Filial IDs (comma separated)", value=filial_ids_val)
+                        
+                        # --- CATEGORY: Asterisk (AMI) ---
+                        st.markdown("#### 📞 Asterisk / AMI Configuration")
                         ast = inst.get('asterisk', {})
-                        new_ast_host = st.text_input("Host", value=ast.get('host', ''))
-                        new_ast_user = st.text_input("Username", value=ast.get('username', ''))
-                        new_ast_pass = st.text_input("Password", value=ast.get('password', ''), type="password")
+                        a_col1, a_col2, a_col3 = st.columns(3)
+                        with a_col1:
+                            new_ast_host = st.text_input("AMI Host", value=ast.get('host', ''))
+                        with a_col2:
+                            new_ast_port = st.text_input("AMI Port", value=ast.get('port', '8088'))
+                        with a_col3:
+                            new_ast_user = st.text_input("AMI Username", value=ast.get('username', ''))
                         
-                        if st.form_submit_button("💾 Save Changes", use_container_width=True):
+                        a_col4, a_col5, a_col6 = st.columns(3)
+                        with a_col4:
+                            new_ast_pass = st.text_input("AMI Password", value=ast.get('password', ''), type="password")
+                        with a_col5:
+                            new_ast_context = st.text_input("Context", value=ast.get('context', 'auto-charger-context'))
+                        with a_col6:
+                            new_ast_ext = st.text_input("Extension", value=ast.get('extension', 'start'))
+                        
+                        a_col7, a_col8, a_col9 = st.columns(3)
+                        with a_col7:
+                            new_ast_ch_type = st.text_input("Channel Type", value=ast.get('channel_type', 'SIP'))
+                        with a_col8:
+                            new_ast_channel = st.text_input("Channel Name", value=ast.get('channel', ''))
+                        with a_col9:
+                            new_ast_ch_avail = st.number_input("Max Channels", value=ast.get('num_channel_available', 10), min_value=1)
+
+                        # --- CATEGORY: CDR Database ---
+                        st.markdown("#### 📊 CDR Database")
+                        c_col1, c_col2, c_col3, c_col4 = st.columns(4)
+                        with c_col1:
+                            new_cdr_host = st.text_input("CDR Host", value=ast.get('cdr_host', ''))
+                        with c_col2:
+                            new_cdr_port = st.text_input("CDR Port", value=ast.get('cdr_port', '80'))
+                        with c_col3:
+                            new_cdr_user = st.text_input("CDR User", value=ast.get('cdr_username', ''))
+                        with c_col4:
+                            new_cdr_pass = st.text_input("CDR Password", value=ast.get('cdr_password', ''), type="password")
+
+                        # --- CATEGORY: Collection Rules ---
+                        st.markdown("#### ⚖️ Collection / Charger Rules")
+                        chg = inst.get('charger', {})
+                        r_col1, r_col2, r_col3, r_col4 = st.columns(4)
+                        with r_col1:
+                            new_min_days = st.number_input("Min Days to Charge", value=chg.get('minimum_days_to_charge', 7))
+                        with r_col2:
+                            new_max_days = st.number_input("Max Days Search", value=chg.get('max_days_to_search', 30))
+                        with r_col3:
+                            new_dial_int = st.number_input("Dial Interval (min)", value=chg.get('dial_interval', 4))
+                        with r_col4:
+                            new_dial_day = st.number_input("Dials per Day", value=chg.get('dial_per_day', 3))
+
+                        st.markdown("<br>", unsafe_allow_html=True)
+                        if st.form_submit_button("💾 Save Configuration Changes", use_container_width=True, type="primary"):
+                            # Prepare update
                             update_doc = {
                                 "instance_name": new_name,
                                 "status.active": new_active,
-                                "status.last_sync": datetime.now().isoformat(),
+                                "erp.type": new_erp_type,
                                 "erp.base_url": new_erp_url,
                                 "erp.auth.user_token": new_erp_token,
+                                "erp.filial_id": [int(x.strip()) for x in new_filial_ids.split(",") if x.strip().isdigit()],
                                 "asterisk.host": new_ast_host,
+                                "asterisk.port": new_ast_port,
                                 "asterisk.username": new_ast_user,
                                 "asterisk.password": new_ast_pass,
+                                "asterisk.context": new_ast_context,
+                                "asterisk.extension": new_ast_ext,
+                                "asterisk.channel_type": new_ast_ch_type,
+                                "asterisk.channel": new_ast_channel,
+                                "asterisk.num_channel_available": new_ast_ch_avail,
+                                "asterisk.cdr_host": new_cdr_host,
+                                "asterisk.cdr_port": new_cdr_port,
+                                "asterisk.cdr_username": new_cdr_user,
+                                "asterisk.cdr_password": new_cdr_pass,
+                                "charger.minimum_days_to_charge": new_min_days,
+                                "charger.max_days_to_search": new_max_days,
+                                "charger.dial_interval": new_dial_int,
+                                "charger.dial_per_day": new_dial_day,
                                 "metadata.updated_at": datetime.now().isoformat()
                             }
                             
                             instances_col.update_one({"_id": inst["_id"]}, {"$set": update_doc})
-                            st.success(f"✅ Updated {new_name}")
+                            st.success(f"✅ Configuration for {new_name} updated!")
                             st.rerun()
                 
-                with actions_tab:
-                    st.write("**Quick Actions**")
+                else:
+                    # YAML/JSON Editor
+                    import json
+                    st.markdown("#### 🛠️ Raw JSON Editor")
+                    st.caption("Edit the raw configuration document below. Be careful with the structure.")
                     
-                    col_a1, col_a2 = st.columns(2)
+                    # Convert ObjectId and other non-serializable fields for Editor
+                    serializable_inst = json.loads(json.dumps(inst, default=str))
                     
-                    with col_a1:
-                        if st.button("🔄 Toggle Active", key=f"toggle_{inst['_id']}", use_container_width=True):
-                            new_status = not is_active
-                            instances_col.update_one(
-                                {"_id": inst["_id"]}, 
-                                {"$set": {
-                                    "status.active": new_status, 
-                                    "status.last_sync": datetime.now().isoformat()
-                                }}
-                            )
-                            st.success(f"Status changed to {'Active' if new_status else 'Inactive'}")
-                            st.rerun()
+                    # Tool to remove _id for editing if desired, but we need it for update.
+                    # Usually better to exclude _id from text area to avoid tampering.
+                    edit_inst = serializable_inst.copy()
+                    if "_id" in edit_inst: del edit_inst["_id"]
+
+                    json_str = st.text_area("JSON Content", value=json.dumps(edit_inst, indent=4), height=500, key=f"json_edit_{inst['_id']}")
                     
-                    with col_a2:
+                    c_col1, c_col2 = st.columns(2)
+                    with c_col1:
+                        if st.button("💾 Save JSON Changes", key=f"save_json_{inst['_id']}", use_container_width=True, type="primary"):
+                            try:
+                                updated_data = json.loads(json_str)
+                                # Keep the original ID
+                                instances_col.replace_one({"_id": inst["_id"]}, updated_data)
+                                st.success("✅ JSON Configuration updated!")
+                                st.rerun()
+                            except Exception as e:
+                                st.error(f"❌ Invalid JSON: {e}")
+                    
+                    with c_col2:
                         # Export single instance
-                        inst_json = export_to_json(inst, f"{inst_name}.json")
+                        inst_json_dl = json.dumps(inst, indent=4, default=str)
                         st.download_button(
-                            label="📥 Export JSON",
-                            data=inst_json,
+                            label="📥 Download JSON Backup",
+                            data=inst_json_dl,
                             file_name=f"{inst_name}_config.json",
                             mime="application/json",
-                            key=f"export_{inst['_id']}",
+                            key=f"dl_json_{inst['_id']}",
                             use_container_width=True
                         )
-                    
-                    st.divider()
-                    st.write("**Danger Zone**")
-                    
-                    confirm_delete = st.checkbox(
-                        f"⚠️ I understand this will permanently delete {inst_name}",
-                        key=f"confirm_{inst['_id']}"
-                    )
-                    
-                    if st.button("🗑️ Delete Instance", 
-                                key=f"del_{inst['_id']}", 
-                                disabled=not confirm_delete,
-                                type="primary",
-                                use_container_width=True):
+
+                # Danger Zone outside the tabs but inside expander
+                st.divider()
+                with st.expander("🗑️ Danger Zone"):
+                    st.write(f"Are you sure you want to delete **{inst_name}**?")
+                    if st.button("🗑️ Delete Permanently", key=f"del_{inst['_id']}", type="primary", use_container_width=True):
                         instances_col.delete_one({"_id": inst["_id"]})
                         st.success(f"✅ Deleted {inst_name}")
                         st.rerun()
@@ -153,29 +239,89 @@ with tab1:
 with tab2:
     st.subheader("Add New Instance Configuration")
     with st.form("new_instance_form"):
-        name = st.text_input("Instance Name*", placeholder="e.g. Acme Corp")
+        # --- CATEGORY: General ---
+        st.markdown("#### ⚙️ General Settings")
+        g_col1, g_col2 = st.columns(2)
+        with g_col1:
+            name = st.text_input("Instance Name*", placeholder="e.g. Acme Corp")
+        with g_col2:
+            active = st.toggle("Active Instance", value=True)
+            
+        # --- CATEGORY: ERP ---
+        st.markdown("#### 🔌 ERP Configuration")
+        erp_col1, erp_col2 = st.columns([3, 1])
+        with erp_col1:
+            erp_url = st.text_input("Base URL*", "https://ixc.sample.com.br/webservice/v1")
+        with erp_col2:
+            erp_type = st.selectbox("Type*", ["ixc", "rbx", "altarede"])
+            
+        e_col3, e_col4 = st.columns(2)
+        with e_col3:
+            erp_token = st.text_input("User Token*", type="password")
+        with e_col4:
+            filial_ids = st.text_input("Filial IDs (comma separated)", "1")
         
-        st.write("**ERP Configuration (IXC)**")
-        erp_url = st.text_input("Base URL*", "https://ixc.sample.com.br/webservice/v1")
-        erp_token = st.text_input("User Token*", type="password")
-        filial_ids = st.text_input("Filial IDs (comma separated)", "1")
+        # --- CATEGORY: Asterisk (AMI) ---
+        st.markdown("#### 📞 Asterisk / AMI Configuration")
+        a_col1, a_col2, a_col3 = st.columns(3)
+        with a_col1:
+            ast_host = st.text_input("AMI Host*", "0.0.0.0")
+        with a_col2:
+            ast_port = st.text_input("AMI Port*", "8088")
+        with a_col3:
+            ast_user = st.text_input("AMI Username*", "admin")
         
-        st.write("**Asterisk Configuration**")
-        ast_host = st.text_input("Host*", "0.0.0.0")
-        ast_user = st.text_input("Username*", "admin")
-        ast_pass = st.text_input("Password*", type="password")
-        ast_channel = st.text_input("Channel*", "biller-trunk")
+        a_col4, a_col5, a_col6 = st.columns(3)
+        with a_col4:
+            ast_pass = st.text_input("AMI Password*", type="password")
+        with a_col5:
+            ast_context = st.text_input("Context", "auto-charger-context")
+        with a_col6:
+            ast_ext = st.text_input("Extension", "start")
         
-        submitted = st.form_submit_button("➕ Create Instance", use_container_width=True)
+        a_col7, a_col8, a_col9 = st.columns(3)
+        with a_col7:
+            ast_ch_type = st.text_input("Channel Type", "SIP")
+        with a_col8:
+            ast_channel = st.text_input("Channel Name*", "trunk-name")
+        with a_col9:
+            ast_ch_avail = st.number_input("Max Channels", value=10, min_value=1)
+
+        # --- CATEGORY: CDR Database ---
+        st.markdown("#### 📊 CDR Database")
+        c_col1, c_col2, c_col3, c_col4 = st.columns(4)
+        with c_col1:
+            cdr_host = st.text_input("CDR Host*", "0.0.0.0 (usually AMI Host)")
+        with c_col2:
+            cdr_port = st.text_input("CDR Port*", "80")
+        with c_col3:
+            cdr_user = st.text_input("CDR User*", "admin")
+        with c_col4:
+            cdr_pass = st.text_input("CDR Password*", type="password")
+
+        # --- CATEGORY: Collection Rules ---
+        st.markdown("#### ⚖️ Collection / Charger Rules")
+        r_col1, r_col2, r_col3, r_col4 = st.columns(4)
+        with r_col1:
+            min_days = st.number_input("Min Days to Charge", value=7)
+        with r_col2:
+            max_days = st.number_input("Max Days Search", value=30)
+        with r_col3:
+            dial_int = st.number_input("Dial Interval (min)", value=4)
+        with r_col4:
+            dial_day = st.number_input("Dials per Day", value=3)
+
+        st.markdown("<br>", unsafe_allow_html=True)
+        submitted = st.form_submit_button("➕ Create Instance", use_container_width=True, type="primary")
         
         if submitted:
-            if not name or not erp_token or not ast_host or not ast_user or not ast_pass:
+            if not name or not erp_token or not ast_host or not ast_user or not ast_pass or not ast_channel:
                 st.error("❌ Please fill all required fields (marked with *)")
             else:
                 new_doc = {
                     "instance_name": name,
                     "erp": {
-                        "type": "ixc",
+                        "type": erp_type,
                         "base_url": erp_url,
                         "auth": {"user_id": "", "user_token": erp_token},
                         "filial_id": [int(x.strip()) for x in filial_ids.split(",") if x.strip().isdigit()],
@@ -187,28 +333,28 @@ with tab2:
                         }
                     },
                     "charger": {
-                        "minimum_days_to_charge": 7,
-                        "max_days_to_search": 30,
-                        "dial_interval": 4,
-                        "dial_per_day": 3
+                        "minimum_days_to_charge": min_days,
+                        "max_days_to_search": max_days,
+                        "dial_interval": dial_int,
+                        "dial_per_day": dial_day
                     },
                     "asterisk": {
                         "host": ast_host,
-                        "port": "8088",
+                        "port": ast_port,
                         "username": ast_user,
                         "password": ast_pass,
-                        "context": "auto-charger-context",
-                        "extension": "start",
-                        "channel_type": "SIP",
+                        "context": ast_context,
+                        "extension": ast_ext,
+                        "channel_type": ast_ch_type,
                         "channel": ast_channel,
-                        "num_channel_available": 10,
-                        "cdr_host": ast_host,
-                        "cdr_port": "80",
-                        "cdr_username": ast_user,
-                        "cdr_password": ast_pass
+                        "num_channel_available": ast_ch_avail,
+                        "cdr_host": cdr_host,
+                        "cdr_port": cdr_port,
+                        "cdr_username": cdr_user,
+                        "cdr_password": cdr_pass
                     },
                     "status": {
-                        "active": True,
+                        "active": active,
                         "last_sync": datetime.now().isoformat(),
                         "health": "ok"
                     },

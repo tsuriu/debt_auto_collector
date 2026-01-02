@@ -182,6 +182,16 @@ if selected_instance_name == "🌍 Global (All Active)":
                     for subkey, val in b_stats[key].items():
                         total_metrics["bill"]["bill_stats"][key][subkey] = total_metrics["bill"]["bill_stats"][key].get(subkey, 0) + val
 
+            # Merge expired_age
+            expired_age_list = b.get("bill_stats", {}).get("expired_age", [])
+            if expired_age_list:
+                if "expired_age" not in total_metrics["bill"]["bill_stats"]:
+                    total_metrics["bill"]["bill_stats"]["expired_age"] = {}
+                for item in expired_age_list:
+                    age_id = str(item.get("_id"))
+                    count = item.get("count", 0)
+                    total_metrics["bill"]["bill_stats"]["expired_age"][age_id] = total_metrics["bill"]["bill_stats"]["expired_age"].get(age_id, 0) + count
+
             total_metrics["actions_today"]["dialer_triggers"] += d.get("actions_today", {}).get("dialer_triggers", 0)
     
     data = total_metrics
@@ -198,16 +208,16 @@ else:
         data = {}
 
 # --- Layout: Header ---
-col_h1, col_h2 = st.columns([8, 2])
-with col_h1:
-    st.markdown("### ⊞ Debt Collection Report")
-    st.markdown("<p style='color: #64748b; margin-top: -15px;'>Real-time insights into clients and billing status</p>", unsafe_allow_html=True)
-with col_h2:
-    st.markdown("<div style='display: flex; gap: 8px; justify-content: flex-end;'>", unsafe_allow_html=True)
-    # Buttons removed as requested
-    st.markdown("</div>", unsafe_allow_html=True)
+# col_h1, col_h2 = st.columns([8, 2])
+# with col_h1:
+#     st.markdown("### ⊞ Debt Collection Report")
+#     st.markdown("<p style='color: #64748b; margin-top: -15px;'>Real-time insights into clients and billing status</p>", unsafe_allow_html=True)
+# with col_h2:
+#     st.markdown("<div style='display: flex; gap: 8px; justify-content: flex-end;'>", unsafe_allow_html=True)
+#     # Buttons removed as requested
+#     st.markdown("</div>", unsafe_allow_html=True)
 
-st.markdown("<br>", unsafe_allow_html=True)
+# st.markdown("<br>", unsafe_allow_html=True)
 
 # --- Layout: Clients ---
 with st.container():
@@ -392,7 +402,7 @@ with st.container():
 st.markdown("<br>", unsafe_allow_html=True)
 
 # --- Layout: Charts ---
-c1, c2 = st.columns(2)
+c1, c2, c3 = st.columns(3)
 
 with c1:
     st.markdown("<div class='section-header'>🌐 Tipo Cliente</div>", unsafe_allow_html=True)
@@ -414,25 +424,24 @@ with c1:
             })
         
         options = {
-            "tooltip": {"trigger": "item"},
+            "tooltip": {"trigger": "axis"},
+           # "legend": {"data": ["Count"]},
+            "grid": {"left": "3%", "right": "4%", "bottom": "3%", "containLabel": True},
+            "xAxis": {
+                "type": "category",
+                "data": df_tipo['Tipo'].tolist(),
+                "axisLabel": {"interval": 0, "rotate": 30}
+            },
+            "yAxis": {"type": "value"},
             "series": [{
-                "name": "Tipo Cliente",
-                "type": "pie",
-                "radius": ["30%", "70%"],
-                "center": ["50%", "50%"],
-                "roseType": "area",
-                "itemStyle": {
-                    "borderRadius": 8
-                },
-                "label": {
-                    "show": True,
-                    "fontSize": 11,
-                    "color": "#0f172a"
-                },
-                "data": chart_data
+                "name": "Count",
+                "type": "bar",
+                "data": df_tipo['Count'].tolist(),
+                "itemStyle": {"color": "#5b73e8", "borderRadius": [4, 4, 0, 0]},
+                "label": {"show": True, "position": "top"}
             }]
         }
-        st_echarts(options=options, height="350px")
+        st_echarts(options=options, height="400px")
     else:
         st.info("No data available")
 
@@ -456,24 +465,61 @@ with c2:
             })
         
         options = {
-            "tooltip": {"trigger": "item"},
+            "tooltip": {"trigger": "axis"},
+           # "legend": {"data": ["Count"]},
+            "grid": {"left": "3%", "right": "4%", "bottom": "3%", "containLabel": True},
+            "xAxis": {
+                "type": "category",
+                "data": df_bairro['Bairro'].tolist(),
+                "axisLabel": {"interval": 0, "rotate": 30}
+            },
+            "yAxis": {"type": "value"},
             "series": [{
-                "name": "Bairro",
-                "type": "pie",
-                "radius": ["30%", "70%"],
-                "center": ["50%", "50%"],
-                "roseType": "area",
-                "itemStyle": {
-                    "borderRadius": 8
-                },
-                "label": {
-                    "show": True,
-                    "fontSize": 11,
-                    "color": "#0f172a"
-                },
-                "data": chart_data
+                "name": "Count",
+                "type": "bar",
+                "data": df_bairro['Count'].tolist(),
+                "itemStyle": {"color": "#5b73e8", "borderRadius": [4, 4, 0, 0]},
+                "label": {"show": True, "position": "top"}
             }]
         }
-        st_echarts(options=options, height="350px")
+        st_echarts(options=options, height="400px")
+    else:
+        st.info("No data available")
+
+with c3:
+    st.markdown("<div class='section-header'>⏳ Expired Age (Days)</div>", unsafe_allow_html=True)
+    exp_age_raw = data.get('bill', {}).get('bill_stats', {}).get('expired_age', [])
+    
+    # expired_age can be a list of dicts (single instance) or a dict (Global view merge)
+    if isinstance(exp_age_raw, dict):
+        df_age = pd.DataFrame(list(exp_age_raw.items()), columns=['Age', 'Count'])
+    else:
+        df_age = pd.DataFrame(exp_age_raw)
+        if not df_age.empty:
+            df_age = df_age.rename(columns={'_id': 'Age'})
+    
+    if not df_age.empty:
+        df_age['Age'] = df_age['Age'].astype(int)
+        df_age = df_age.sort_values('Count', ascending=False).head(8)
+        df_age = df_age.sort_values('Age') # Sort by age for logical X axis
+        
+        options = {
+            "tooltip": {"trigger": "axis"},
+           # "legend": {"data": ["Count"]},
+            "grid": {"left": "3%", "right": "4%", "bottom": "3%", "containLabel": True},
+            "xAxis": {
+                "type": "category",
+                "data": [f"{int(x)}d" for x in df_age['Age']],
+            },
+            "yAxis": {"type": "value"},
+            "series": [{
+                "name": "Count",
+                "type": "bar",
+                "data": df_age['Count'].tolist(),
+                "itemStyle": {"color": "#6366f1", "borderRadius": [4, 4, 0, 0]},
+                "label": {"show": True, "position": "top"}
+            }]
+        }
+        st_echarts(options=options, height="400px")
     else:
         st.info("No data available")
