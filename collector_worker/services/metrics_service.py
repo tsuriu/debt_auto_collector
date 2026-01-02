@@ -202,10 +202,26 @@ class MetricsService:
             })
 
             # 4. CDR Metrics (from last_reports)
-            last_report = self.db.last_reports.find_one(
-                {"instance_full_id": self.instance_full_id},
-                sort=[("last_run_timestamp", -1)]
-            )
+            today_str = datetime.now().strftime("%Y-%m-%d")
+            
+            pipeline_cdr = [
+                {
+                    "$match": {
+                        "instance_full_id": self.instance_full_id,
+                        "date_collected": today_str
+                    }
+                },
+                {
+                    "$group": {
+                        "_id": None,
+                        "total_calls": {"$sum": 1},
+                        "avg_duration": {"$avg": {"$toDouble": "$duration"}},
+                        "dispositions": {"$push": "$disposition"}
+                    }
+                }
+            ]
+            
+            res_cdr = list(self.db.last_reports.aggregate(pipeline_cdr))
             
             cdr_metrics = {
                 "dispositions": {},
@@ -213,22 +229,15 @@ class MetricsService:
                 "total_calls": 0
             }
             
-            if last_report and "data" in last_report:
-                cdrs = last_report["data"]
-                cdr_metrics["total_calls"] = len(cdrs)
+            if res_cdr:
+                cdr_data = res_cdr[0]
+                cdr_metrics["total_calls"] = cdr_data.get("total_calls", 0)
+                cdr_metrics["average_duration"] = round(cdr_data.get("avg_duration", 0) or 0, 2)
                 
-                durations = []
-                for cdr in cdrs:
-                    disp = cdr.get("disposition", "UNKNOWN")
-                    cdr_metrics["dispositions"][disp] = cdr_metrics["dispositions"].get(disp, 0) + 1
-                    
-                    try:
-                        durations.append(float(cdr.get("duration", 0)))
-                    except (ValueError, TypeError):
-                        pass
-                
-                if durations:
-                    cdr_metrics["average_duration"] = round(sum(durations) / len(durations), 2)
+                # Count dispositions
+                for disp in cdr_data.get("dispositions", []):
+                    if disp:
+                        cdr_metrics["dispositions"][disp] = cdr_metrics["dispositions"].get(disp, 0) + 1
 
             # 5. Construct Metric Document
             metric_doc = {

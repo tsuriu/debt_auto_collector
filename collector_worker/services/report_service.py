@@ -19,7 +19,8 @@ class ReportService:
         "lastapp",
         "disposition",
         "duration",
-        "uniqueid"
+        "uniqueid",
+        "userfield"
     ]
 
     CDR_FIELDS_INDEX = [        
@@ -28,7 +29,8 @@ class ReportService:
         "channel",
         "disposition",
         "duration",
-        "uniqueid"
+        "uniqueid",
+        "userfield"
     ]
 
     EVENT_FIELDS = [
@@ -127,6 +129,11 @@ class ReportService:
             cdrs = []
             for row in rows:
                 cdr = {field: self.clean_html(row[i]) if i < len(row) else None for i, field in enumerate(self.CDR_FIELDS)}
+                
+                # New Logic: userfield == AMD_MACHINE -> disposition = NO ANSWER
+                if cdr.get("userfield") == "AMD_MACHINE":
+                    cdr["disposition"] = "NO ANSWER"
+
                 cdr = {k: v for k, v in cdr.items() if k in self.CDR_FIELDS_INDEX}
                 cdr["full_id"] = cdr.pop("src") if "src" in cdr else cdr.get("full_id")
                 cdrs.append(cdr)
