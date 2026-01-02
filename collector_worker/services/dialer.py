@@ -162,19 +162,15 @@ class Dialer:
 
     def trigger_call(self, call_data):
         logger.info(f"Triggering call for {call_data}")
-        # number = call_data['contact']
+        number = call_data['contact']
         client_id = call_data['client_id']
         # total_value = call_data['total_value'] # Unused in ARI payload
         
         # ARI Config
         host = self.pabx.get('host', '127.0.0.1')
         port = self.pabx.get('port', '8088')
-        # user = self.pabx.get('username', 'admin-remote')
-        # password = self.pabx.get('password', 'e45b6e3959@64eu.7!4eu#')
-
-        user = 'admin-remote'
-        password = 'e45b6e3959@64eu.7!4eu#'
-        number = '82996216359'
+        user = self.pabx.get('username', 'admin')
+        password = self.pabx.get('password', 'admin')
     
         schema = self.pabx.get('schema', 'http')
         
