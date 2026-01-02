@@ -118,9 +118,30 @@ instances = list(db.instance_config.find({"status.active": True}, {"instance_nam
 instance_options = ["🌍 Global (All Active)"] + [i["instance_name"] for i in instances]
 selected_instance_name = st.sidebar.selectbox("Select View", instance_options)
 
+def format_time_ago(dt):
+    if not dt:
+        return "Unknown"
+    now = datetime.now()
+    diff = now - dt
+    
+    seconds = diff.total_seconds()
+    if seconds < 60:
+        return "Just now"
+    elif seconds < 3600:
+        minutes = int(seconds // 60)
+        return f"{minutes}m ago"
+    elif seconds < 86400:
+        hours = int(seconds // 3600)
+        return f"{hours}h ago"
+    else:
+        days = int(seconds // 86400)
+        return f"{days}d ago"
+
 # --- Data Fetching Logic ---
 def get_latest_metrics(full_id):
     return db.metrics.find_one({"instance_full_id": full_id}, sort=[("timestamp", -1)])
+
+last_update_ts = None
 
 if selected_instance_name == "🌍 Global (All Active)":
     total_metrics = {
@@ -133,6 +154,10 @@ if selected_instance_name == "🌍 Global (All Active)":
         f_id = f"{inst['instance_name']}-{inst.get('erp',{}).get('type','ixc')}-{str(inst['_id'])}"
         m = get_latest_metrics(f_id)
         if m and "data" in m:
+            ts = m.get("timestamp")
+            if ts and (not last_update_ts or ts > last_update_ts):
+                last_update_ts = ts
+                
             d = m["data"]
             c = d.get("clients", {})
             total_metrics["clients"]["total"] += c.get("total", 0)
@@ -164,9 +189,13 @@ else:
     inst_doc = next(i for i in instances if i["instance_name"] == selected_instance_name)
     f_id = f"{selected_instance_name}-{inst_doc.get('erp',{}).get('type','ixc')}-{str(inst_doc['_id'])}"
     m = get_latest_metrics(f_id)
-    data = m["data"] if m else {}
-    if "bill" not in data and "bills" in data:
-        data["bill"] = data["bills"]
+    if m:
+        last_update_ts = m.get("timestamp")
+        data = m["data"]
+        if "bill" not in data and "bills" in data:
+            data["bill"] = data["bills"]
+    else:
+        data = {}
 
 # --- Layout: Header ---
 col_h1, col_h2 = st.columns([8, 2])
@@ -175,15 +204,15 @@ with col_h1:
     st.markdown("<p style='color: #64748b; margin-top: -15px;'>Real-time insights into clients and billing status</p>", unsafe_allow_html=True)
 with col_h2:
     st.markdown("<div style='display: flex; gap: 8px; justify-content: flex-end;'>", unsafe_allow_html=True)
-    st.button("⊞ Filter", type="secondary")
-    st.button("📥 Export Report", type="primary")
+    # Buttons removed as requested
     st.markdown("</div>", unsafe_allow_html=True)
 
 st.markdown("<br>", unsafe_allow_html=True)
 
 # --- Layout: Clients ---
 with st.container():
-    st.markdown("<div class='section-header'>👤 Clients <span style='margin-left: auto; font-size: 0.75rem; background: #dbeafe; color: #1e40af; padding: 2px 8px; border-radius: 4px;'>Updated Today</span></div>", unsafe_allow_html=True)
+    time_ago = format_time_ago(last_update_ts)
+    st.markdown(f"<div class='section-header'>👤 Clients <span style='margin-left: auto; font-size: 0.75rem; background: #dbeafe; color: #1e40af; padding: 2px 8px; border-radius: 4px;'>Updated {time_ago}</span></div>", unsafe_allow_html=True)
     
     c_col1, c_col2, c_col3 = st.columns([1, 1.5, 3])
     
@@ -281,49 +310,83 @@ st.markdown("<br>", unsafe_allow_html=True)
 with st.container():
     st.markdown("<div class='section-header'>🧾 Bills Overview <span style='margin-left: auto; color: #94a3b8;'>...</span></div>", unsafe_allow_html=True)
     
-    b_col1, b_col2 = st.columns([1, 2])
+    b_col1, b_col2, b_col3 = st.columns([2.5, 6, 4.5])
     
+    expired_total = data.get('bill', {}).get('expired', 0)
+    val_pre = data.get('bill', {}).get('value_pre_force_debt_collection', 0)
+    val_force = data.get('bill', {}).get('value_force_debt_collection', 0)
+    expired_value = val_pre + val_force
+    
+    cnt_pre = data.get('bill', {}).get('count_pre_force_debt_collection', 0)
+    cnt_force = data.get('bill', {}).get('count_force_debt_collection', 0)
+
     with b_col1:
         st.markdown(f"""
-        <div style='margin-bottom: 24px;'>
-            <div class='kpi-label'>Expired Total</div>
-            <div class='kpi-value'>{data.get('bill', {}).get('expired', 0):,}</div>
-        </div>
-        <div>
-            <div class='kpi-label'>Expired Value</div>
-            <div class='kpi-value'>R$ {data.get('bill', {}).get('value_pre_force_debt_collection', 0) + data.get('bill', {}).get('value_force_debt_collection', 0):,.2f}</div>
-            <div style='color: #94a3b8; font-size: 0.75rem;'>Exact: R$ {data.get('bill', {}).get('value_pre_force_debt_collection', 0) + data.get('bill', {}).get('value_force_debt_collection', 0):,.2f}</div>
+        <div style='display: flex; gap: 32px;'>
+            <div>
+                <div class='kpi-label'>Expired Total</div>
+                <div class='kpi-value' style='font-size: 1.5rem !important;'>{expired_total:,}</div>
+            </div>
+            <div>
+                <div class='kpi-label'>Expired Value</div>
+                <div class='kpi-value' style='font-size: 1.5rem !important;'>R$ {expired_value:,.2f}</div>
+            </div>
         </div>
         """, unsafe_allow_html=True)
         
     with b_col2:
-        val_pre = data.get('bill', {}).get('value_pre_force_debt_collection', 0)
-        val_force = data.get('bill', {}).get('value_force_debt_collection', 0)
-        cnt_pre = data.get('bill', {}).get('count_pre_force_debt_collection', 0)
-        cnt_force = data.get('bill', {}).get('count_force_debt_collection', 0)
+        # ECharts Stacked Horizontal Bar for Bill Counts - This is now the "Big Item"
+        options = {
+            "tooltip": {
+                "trigger": "axis",
+                "axisPointer": {"type": "shadow"}
+            },
+            "legend": {},
+            "grid": {
+                "left": 0, "right": 0, "top": 10, "bottom": 0,
+            },
+            "xAxis": {"type": "value"},
+            "yAxis": {
+                "type": "category",
+                "data": ["Bills"],
+                "show": False
+            },
+            "series": [
+                {
+                    "name": "Pre-Debt Collection",
+                    "type": "bar",
+                    "stack": "total",
+                    "label": {"show": True, "fontWeight": "bold"},
+                    "emphasis": {"focus": "series"},
+                    "itemStyle": {"color": "#f59e0b"},
+                    "data": [cnt_pre]
+                },
+                {
+                    "name": "Debt Collector",
+                    "type": "bar",
+                    "stack": "total",
+                    "label": {"show": True, "fontWeight": "bold"},
+                    "emphasis": {"focus": "series"},
+                    "itemStyle": {"color": "#ef4444"},
+                    "data": [cnt_force]
+                }
+            ]
+        }
+        st_echarts(options=options, height="100px")
         
+    with b_col3:
+        # Colored Pads for Value Breakdown - Side-by-Side - Adjusted padding
         st.markdown(f"""
-        <table class='custom-table' style='width: 100%; border-collapse: collapse;'>
-            <thead>
-                <tr>
-                    <th>Stage</th>
-                    <th>Count</th>
-                    <th>Value</th>
-                </tr>
-            </thead>
-            <tbody>
-                <tr>
-                    <td><span style='color: #f59e0b;'>●</span> Pre-Debt Collection</td>
-                    <td>{cnt_pre}</td>
-                    <td>R$ {val_pre:,.2f}</td>
-                </tr>
-                <tr>
-                    <td><span style='color: #ef4444;'>●</span> Debt Collector</td>
-                    <td>{cnt_force}</td>
-                    <td>R$ {val_force:,.2f}</td>
-                </tr>
-            </tbody>
-        </table>
+        <div style='display: flex; gap: 8px;'>
+            <div style='flex: 1; background: #fffbeb; padding: 12px; border-radius: 12px; border: 1px solid #fde68a;'>
+                <div class='kpi-label' style='color: #92400e; font-size: 0.7rem;'>Pre-Debt</div>
+                <div class='kpi-value' style='color: #b45309; font-size: 1.25rem !important;'>R$ {val_pre:,.2f}</div>
+            </div>
+            <div style='flex: 1; background: #fef2f2; padding: 12px; border-radius: 12px; border: 1px solid #fee2e2;'>
+                <div class='kpi-label' style='color: #991b1b; font-size: 0.7rem;'>Debt Collector</div>
+                <div class='kpi-value' style='color: #b91c1c; font-size: 1.25rem !important;'>R$ {val_force:,.2f}</div>
+            </div>
+        </div>
         """, unsafe_allow_html=True)
 
 st.markdown("<br>", unsafe_allow_html=True)
