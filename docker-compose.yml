@@ -17,6 +17,24 @@ services:
     depends_on:
       - mongo
 
+  collector_frontend:
+    build:
+      context: .
+      dockerfile: collector_frontend/Dockerfile
+    container_name: collector_frontend
+    restart: unless-stopped
+    networks:
+      - debt_collector_net
+    environment:
+      - MONGO_URI=mongodb://root:rootpassword@mongo:27017/debt_collector?authSource=admin
+      - TZ=America/Maceio
+    ports:
+      - "8501:8501"
+    volumes:
+      - ./collector_frontend:/app
+    depends_on:
+      - mongo
+
   mongo:
     image: mongo:latest
     container_name: debt_collector_mongo
