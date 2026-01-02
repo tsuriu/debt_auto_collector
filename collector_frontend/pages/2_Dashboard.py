@@ -141,14 +141,28 @@ def format_time_ago(dt):
 def get_latest_metrics(full_id):
     return db.metrics.find_one({"instance_full_id": full_id}, sort=[("timestamp", -1)])
 
+def get_historical_metrics(full_id=None, limit=20):
+    if full_id:
+        return list(db.metrics.find({"instance_full_id": full_id}, sort=[("timestamp", -1)], limit=limit))
+    else:
+        # For Global view, we fetch the latest N docs from EACH instance
+        all_hist = []
+        for inst in instances:
+            f_id = f"{inst['instance_name']}-{inst.get('erp',{}).get('type','ixc')}-{str(inst['_id'])}"
+            all_hist.extend(list(db.metrics.find({"instance_full_id": f_id}, sort=[("timestamp", -1)], limit=limit)))
+        return all_hist
+
 last_update_ts = None
 
 if selected_instance_name == "🌍 Global (All Active)":
     total_metrics = {
         "clients": {"total": 0, "count_with_open_debt": 0, "count_pre_force_debt_collection": 0, "count_force_debt_collection": 0},
         "bill": {"total": 0, "expired": 0, "count_pre_force_debt_collection": 0, "value_pre_force_debt_collection": 0.0, "count_force_debt_collection": 0, "value_force_debt_collection": 0.0, "bill_stats": {}},
-        "actions_today": {"dialer_triggers": 0}
+        "actions_today": {"dialer_triggers": 0},
+        "cdr_stats": {"total_calls": 0, "average_duration": 0.0, "dispositions": {}}
     }
+    
+    avg_durations = []
     
     for inst in instances:
         f_id = f"{inst['instance_name']}-{inst.get('erp',{}).get('type','ixc')}-{str(inst['_id'])}"
@@ -193,8 +207,22 @@ if selected_instance_name == "🌍 Global (All Active)":
                     total_metrics["bill"]["bill_stats"]["expired_age"][age_id] = total_metrics["bill"]["bill_stats"]["expired_age"].get(age_id, 0) + count
 
             total_metrics["actions_today"]["dialer_triggers"] += d.get("actions_today", {}).get("dialer_triggers", 0)
+
+            # Merge CDR stats
+            cdr = d.get("cdr_stats", {})
+            total_metrics["cdr_stats"]["total_calls"] += cdr.get("total_calls", 0)
+            if "average_duration" in cdr:
+                avg_durations.append(cdr["average_duration"])
+            
+            dispositions = cdr.get("dispositions", {})
+            for disp, count in dispositions.items():
+                total_metrics["cdr_stats"]["dispositions"][disp] = total_metrics["cdr_stats"]["dispositions"].get(disp, 0) + count
+    
+    if avg_durations:
+        total_metrics["cdr_stats"]["average_duration"] = sum(avg_durations) / len(avg_durations)
     
     data = total_metrics
+    hist_metrics = get_historical_metrics(limit=24) # ~24h if hourly
 else:
     inst_doc = next(i for i in instances if i["instance_name"] == selected_instance_name)
     f_id = f"{selected_instance_name}-{inst_doc.get('erp',{}).get('type','ixc')}-{str(inst_doc['_id'])}"
@@ -204,8 +232,10 @@ else:
         data = m["data"]
         if "bill" not in data and "bills" in data:
             data["bill"] = data["bills"]
+        hist_metrics = get_historical_metrics(f_id, limit=24)
     else:
         data = {}
+        hist_metrics = []
 
 # --- Layout: Header ---
 # col_h1, col_h2 = st.columns([8, 2])
@@ -523,3 +553,92 @@ with c3:
         st_echarts(options=options, height="400px")
     else:
         st.info("No data available")
+
+st.markdown("<br>", unsafe_allow_html=True)
+
+# --- Layout: CDR Overview ---
+with st.container():
+    st.markdown("<div class='section-header'>📞 CDR Overview (Call Details)</div>", unsafe_allow_html=True)
+    
+    cdr_col1, cdr_col2 = st.columns([1, 4])
+    
+    cdr_data = data.get("cdr_stats", {})
+    
+    with cdr_col1:
+        st.markdown(f"""
+        <div style='background: #f8fafc; padding: 20px; border-radius: 12px; border: 1px solid #e2e8f0; margin-bottom: 12px;'>
+            <div class='kpi-label'>Total Calls</div>
+            <div class='kpi-value'>{cdr_data.get('total_calls', 0):,}</div>
+        </div>
+        <div style='background: #f8fafc; padding: 20px; border-radius: 12px; border: 1px solid #e2e8f0;'>
+            <div class='kpi-label'>Avg Duration</div>
+            <div class='kpi-value'>{cdr_data.get('average_duration', 0):.1f}s</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with cdr_col2:
+        # Process historical data for Stacked Area Chart
+        if hist_metrics:
+            df_entries = []
+            for h in hist_metrics:
+                # Group by rounded timestamp for cleaner X axis
+                ts = h.get("timestamp")
+                if isinstance(ts, str): ts = datetime.fromisoformat(ts)
+                
+                # Round to nearest 10 min window to consolidate global points if needed
+                ts_key = ts.replace(second=0, microsecond=0)
+                
+                cdr_h = h.get("data", {}).get("cdr_stats", {})
+                disps_h = cdr_h.get("dispositions", {})
+                entry = {"timestamp": ts_key}
+                entry.update(disps_h)
+                df_entries.append(entry)
+            
+            df_hist_graph = pd.DataFrame(df_entries).fillna(0)
+            if not df_hist_graph.empty:
+                df_hist_graph = df_hist_graph.groupby("timestamp").sum().reset_index()
+                df_hist_graph = df_hist_graph.sort_values("timestamp")
+                
+                # Required Dispositions
+                disp_keys = ['ANSWERED', 'BUSY', 'FAILED', 'NO ANSWER', 'CONGESTION']
+                series_data = []
+                # Define distinct colors for each disposition
+                disp_colors = {
+                    'ANSWERED': '#10b981', 
+                    'BUSY': '#f59e0b', 
+                    'FAILED': '#ef4444', 
+                    'NO ANSWER': '#6366f1', 
+                    'CONGESTION': '#94a3b8'
+                }
+                
+                for key in disp_keys:
+                    series_data.append({
+                        "name": key,
+                        "type": "line",
+                        "stack": "Total",
+                        "areaStyle": {},
+                        "emphasis": {"focus": "series"},
+                        "data": df_hist_graph[key].tolist() if key in df_hist_graph else [0] * len(df_hist_graph),
+                        "itemStyle": {"color": disp_colors.get(key, "#ccc")}
+                    })
+                
+                options = {
+                    "tooltip": {
+                        "trigger": "axis",
+                        "axisPointer": {"type": "cross", "label": {"backgroundColor": "#6a7985"}}
+                    },
+                    "legend": {"data": disp_keys},
+                    "grid": {"left": "3%", "right": "4%", "bottom": "3%", "containLabel": True},
+                    "xAxis": [{
+                        "type": "category",
+                        "boundaryGap": False,
+                        "data": df_hist_graph["timestamp"].dt.strftime("%H:%M").tolist()
+                    }],
+                    "yAxis": [{"type": "value"}],
+                    "series": series_data
+                }
+                st_echarts(options=options, height="400px")
+            else:
+                st.info("No historical CDR data found")
+        else:
+            st.info("No historical CDR data found")
