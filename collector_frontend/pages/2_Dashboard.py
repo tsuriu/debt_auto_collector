@@ -171,7 +171,7 @@ else:
 # --- Layout: Header ---
 col_h1, col_h2 = st.columns([8, 2])
 with col_h1:
-    st.markdown("### ⊞ Collection")
+    st.markdown("### ⊞ Debt Collection Report")
     st.markdown("<p style='color: #64748b; margin-top: -15px;'>Real-time insights into clients and billing status</p>", unsafe_allow_html=True)
 with col_h2:
     st.markdown("<div style='display: flex; gap: 8px; justify-content: flex-end;'>", unsafe_allow_html=True)
