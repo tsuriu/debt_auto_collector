@@ -185,7 +185,7 @@ st.markdown("<br>", unsafe_allow_html=True)
 with st.container():
     st.markdown("<div class='section-header'>👤 Clients <span style='margin-left: auto; font-size: 0.75rem; background: #dbeafe; color: #1e40af; padding: 2px 8px; border-radius: 4px;'>Updated Today</span></div>", unsafe_allow_html=True)
     
-    c_col1, c_col2, c_col3 = st.columns([1, 1, 1])
+    c_col1, c_col2, c_col3 = st.columns([1, 1.5, 3])
     
     with c_col1:
         st.markdown(f"""
@@ -214,16 +214,17 @@ with st.container():
                 "trigger": "axis",
                 "axisPointer": {"type": "shadow"}
             },
+            "legend": {},
             "grid": {
                 "left": 0,
                 "right": 0,
                 "top": 10,
                 "bottom": 0,
-                "containLabel": True
+            #     "containLabel": True
             },
             "xAxis": {
                 "type": "value",
-                "show": False
+                # "show": True
             },
             "yAxis": {
                 "type": "category",
@@ -237,12 +238,13 @@ with st.container():
                     "stack": "total",
                     "label": {
                         "show": True,
-                        "position": "inside",
-                        "formatter": f"{pre_debt}",
-                        "color": "#fff",
-                        "fontSize": 14,
+                        # "position": "inside",
+                        # "formatter": f"{pre_debt}",
+                        # "color": "#fff",
+                        # "fontSize": 14,
                         "fontWeight": "bold"
                     },
+                    "emphasis": {"focus": "series"},
                     "itemStyle": {"color": "#f59e0b"},
                     "data": [pre_debt]
                 },
@@ -252,25 +254,26 @@ with st.container():
                     "stack": "total",
                     "label": {
                         "show": True,
-                        "position": "inside",
-                        "formatter": f"{debt_coll}",
-                        "color": "#fff",
-                        "fontSize": 14,
+                        # "position": "inside",
+                        # "formatter": f"{debt_coll}",
+                        # "color": "#fff",
+                        # "fontSize": 14,
                         "fontWeight": "bold"
                     },
+                    "emphasis": {"focus": "series"},
                     "itemStyle": {"color": "#ef4444"},
                     "data": [debt_coll]
                 }
             ]
         }
         
-        st.markdown("""
-        <div style='font-size: 0.75rem; font-weight: 600; margin-bottom: 8px;'>
-            <span style='color: #f59e0b;'>●</span> Pre-Debt Collector &nbsp;
-            <span style='color: #ef4444;'>●</span> Debt Collector
-        </div>
-        """, unsafe_allow_html=True)
-        st_echarts(options=options, height="80px")
+        # st.markdown("""
+        # <div style='font-size: 0.75rem; font-weight: 600; margin-bottom: 8px;'>
+        #     <span style='color: #f59e0b;'>●</span> Pre-Debt Collector &nbsp;
+        #     <span style='color: #ef4444;'>●</span> Debt Collector
+        # </div>
+        # """, unsafe_allow_html=True)
+        st_echarts(options=options, height="100px")
 
 st.markdown("<br>", unsafe_allow_html=True)
 
