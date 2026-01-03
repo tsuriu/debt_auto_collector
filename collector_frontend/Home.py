@@ -5,25 +5,25 @@ from utils_css import apply_light_theme
 import os
 
 st.set_page_config(
-    page_title="Debt Collector Control Center",
+    page_title="Centro de Controle - Debt Collector",
     page_icon="🤖",
     layout="wide"
 )
 
-# Apply light theme
+# Aplicar tema claro
 apply_light_theme()
 
-st.title("🤖 Debt Collector Control Center")
+st.title("🤖 Centro de Controle - Debt Collector")
 
 st.markdown("""
-Welcome to the collector management interface. Use the sidebar to navigate between:
+Bem-vindo à interface de gerenciamento do cobrador automático. Use a barra lateral para navegar entre:
 
-- **📋 Instances**: Manage your ERP and Asterisk instance configurations (CRUD).
-- **📊 Dashboard**: Visualize collection metrics, debt status, and dialer performance.
-- **⚙️ Settings**: Update project-wide environment variables (`.env`).
+- **📋 Instâncias**: Gerencie as configurações de suas instâncias ERP e Asterisk (CRUD).
+- **📊 Dashboard**: Visualize métricas de cobrança, status de dívidas e desempenho do discador.
+- **⚙️ Configurações**: Atualize as variáveis de ambiente globais do projeto (`.env`).
 """)
 
-# System Health Check
+# Health Check do Sistema
 db = get_db()
 mongo_uri = os.getenv("MONGO_URI", "mongodb://localhost:27017/")
 db_name = os.getenv("DB_NAME", "debt_collector")
@@ -31,58 +31,58 @@ db_name = os.getenv("DB_NAME", "debt_collector")
 col1, col2, col3 = st.columns(3)
 
 with col1:
-    st.subheader("🔧 System Status")
+    st.subheader("🔧 Status do Sistema")
     
-    # Test database connection
+    # Testar conexão com o banco de dados
     try:
         db.command('ping')
-        st.success("✅ Database: Connected")
+        st.success("✅ Banco de Dados: Conectado")
         
-        # Get collection stats
+        # Obter estatísticas das coleções
         collections = db.list_collection_names()
-        st.caption(f"Collections: {len(collections)}")
+        st.caption(f"Coleções: {len(collections)}")
     except Exception as e:
-        st.error(f"❌ Database: Disconnected")
-        st.caption(f"Error: {str(e)[:50]}...")
+        st.error(f"❌ Banco de Dados: Desconectado")
+        st.caption(f"Erro: {str(e)[:50]}...")
 
 with col2:
-    st.subheader("📊 Quick Stats")
+    st.subheader("📊 Estatísticas Rápidas")
     
     try:
-        # Count active instances
+        # Contar instâncias ativas
         active_instances = db.instance_config.count_documents({"status.active": True})
         total_instances = db.instance_config.count_documents({})
-        st.metric("Active Instances", active_instances, delta=f"{total_instances} total")
+        st.metric("Instâncias Ativas", active_instances, delta=f"{total_instances} total")
         
-        # Latest metrics timestamp
+        # Timestamp das últimas métricas
         latest_metric = db.metrics.find_one({}, sort=[("timestamp", -1)])
         if latest_metric:
             last_update = format_datetime(latest_metric.get("timestamp"))
-            st.caption(f"Last Metrics: {last_update}")
+            st.caption(f"Últimas Métricas: {last_update}")
         else:
-            st.caption("No metrics collected yet")
+            st.caption("Nenhuma métrica coletada ainda")
             
     except Exception as e:
-        st.warning("Unable to fetch stats")
+        st.warning("Não foi possível carregar as estatísticas")
 
 with col3:
-    st.subheader("🚀 Quick Actions")
+    st.subheader("🚀 Ações Rápidas")
     
     col_a, col_b = st.columns(2)
     with col_a:
-        if st.button("📋 Instances", use_container_width=True):
+        if st.button("📋 Instâncias", use_container_width=True):
             st.switch_page("pages/1_Instances.py")
     
     with col_b:
         if st.button("📊 Dashboard", use_container_width=True):
             st.switch_page("pages/2_Dashboard.py")
     
-    if st.button("⚙️ Settings", use_container_width=True):
+    if st.button("⚙️ Configurações", use_container_width=True):
         st.switch_page("pages/3_Settings.py")
 
-# Recent Activity Preview
+# Prévia de Atividade Recente
 st.divider()
-st.subheader("⚡ Recent System Activity")
+st.subheader("⚡ Atividade Recente do Sistema")
 
 try:
     recent_logs = list(db.history_action_log.find({}).sort("occurred_at", -1).limit(5))
@@ -91,11 +91,20 @@ try:
             icon = "📞" if "dialer" in log.get("action", "") else "⚙️"
             time_str = format_datetime(log.get("occurred_at"))
             action = log.get("action", "unknown").replace("_", " ").title()
-            st.write(f"{icon} **{time_str}** - {action}")
+            # Tradução básica de ações conhecidas
+            action_map = {
+                "Clients Update": "Atualização de Clientes",
+                "Bills Update": "Atualização de Faturas",
+                "Dialer Job": "Execução do Discador",
+                "Metrics Job": "Coleta de Métricas",
+                "Reports Update": "Atualização de Relatórios"
+            }
+            display_action = action_map.get(action, action)
+            st.write(f"{icon} **{time_str}** - {display_action}")
     else:
-        st.info("No recent activity found. The worker service may not be running yet.")
+        st.info("Nenhuma atividade recente encontrada. O serviço pode ainda não estar rodando.")
 except Exception as e:
-    st.warning("Unable to load recent activity")
+    st.warning("Não foi possível carregar a atividade recente")
 
 st.divider()
-st.caption("💡 Tip: Enable auto-refresh on the Dashboard for TV monitoring mode")
+st.caption("💡 Dica: Habilite a atualização automática no Dashboard para modo de monitoramento em TV")

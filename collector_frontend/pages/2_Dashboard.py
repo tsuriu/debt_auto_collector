@@ -11,7 +11,7 @@ from utils_css import apply_light_theme
 from loguru import logger
 from config import Config
 
-st.set_page_config(page_title="Collection Dashboard", layout="wide")
+st.set_page_config(page_title="Dashboard de Cobrança", layout="wide")
 
 # Apply shared light theme
 apply_light_theme()
@@ -65,39 +65,39 @@ try:
     db = get_db()
     db.command('ping')  # Test connection
 except Exception as e:
-    st.error(f"❌ Database connection failed: {e}")
-    st.info("Please check your database settings in the Settings page.")
+    st.error(f"❌ Conexão com o banco de dados falhou: {e}")
+    st.info("Por favor, verifique suas configurações de banco de dados na página de Configurações.")
     st.stop()
 
-# --- Sidebar Controls ---
-st.sidebar.title("⚙️ Dashboard Controls")
+# --- Controles da Barra Lateral ---
+st.sidebar.title("⚙️ Controles do Dashboard")
 
 instances = list(db.instance_config.find({"status.active": True}, {"instance_name": 1, "erp.type": 1}))
 if not instances:
-    st.warning("No active instances found.")
+    st.warning("Nenhuma instância ativa encontrada.")
     st.stop()
 
 instance_options = [i["instance_name"] for i in instances]
-selected_instance_name = st.sidebar.selectbox("Select View", instance_options)
+selected_instance_name = st.sidebar.selectbox("Selecionar Visualização", instance_options)
 
 def format_time_ago(dt):
     if not dt:
-        return "Unknown"
+        return "Desconhecido"
     now = datetime.now()
     diff = now - dt
     
     seconds = diff.total_seconds()
     if seconds < 60:
-        return "Just now"
+        return "Agora mesmo"
     elif seconds < 3600:
         minutes = int(seconds // 60)
-        return f"{minutes}m ago"
+        return f"{minutes}m atrás"
     elif seconds < 86400:
         hours = int(seconds // 3600)
-        return f"{hours}h ago"
+        return f"{hours}h atrás"
     else:
         days = int(seconds // 86400)
-        return f"{days}d ago"
+        return f"{days}d atrás"
 
 # --- Data Fetching Logic ---
 def get_latest_metrics(full_id):
@@ -143,20 +143,20 @@ else:
 with st.container():
     time_ago = format_time_ago(last_update_ts)
     
-    # Header with Controls
+    # Cabeçalho com Controles
     col_title, col_ctrl = st.columns([1.5, 1])
     with col_title:
-        st.markdown(f"<div class='section-header' style='margin-bottom: 0;'>👤 Clients <span style='color: #64748b; font-weight: 400; font-size: 0.9rem; margin-left: 10px;'>({selected_instance_name})</span></div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='section-header' style='margin-bottom: 0;'>👤 Clientes <span style='color: #64748b; font-weight: 400; font-size: 0.9rem; margin-left: 10px;'>({selected_instance_name})</span></div>", unsafe_allow_html=True)
     with col_ctrl:
-        # Mini-controls row
+        # Linha de mini-controles
         c1, c2 = st.columns([1.5, 1])
         
-        # Fixed refresh behavior
+        # Comportamento de atualização fixo
         auto_refresh = True
         refresh_interval = 60
         
         with c1:
-            st.markdown(f"<div class='ctrl-box-last'>Last: {last_update_ts.strftime('%H:%M:%S') if last_update_ts else 'N/A'}</div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='ctrl-box-last'>Última: {last_update_ts.strftime('%H:%M:%S') if last_update_ts else 'N/A'}</div>", unsafe_allow_html=True)
         with c2:
             st.markdown(f"<div class='ctrl-box-time'>{time_ago}</div>", unsafe_allow_html=True)
 
@@ -167,7 +167,7 @@ with st.container():
     with c_col1:
         st.markdown(f"""
         <div class='flex-center'>
-            <div class='kpi-label'>Active Total <span class='kpi-trend trend-up'>📈 +2.4%</span></div>
+            <div class='kpi-label'>Total Ativos <span class='kpi-trend trend-up'>📈 +2.4%</span></div>
             <div class='kpi-value' style='font-size: 1.8rem !important;'>{data.get('clients', {}).get('total', 0):,}</div>
         </div>
         """, unsafe_allow_html=True)
@@ -178,7 +178,7 @@ with st.container():
         pct_debt = (on_debt / total_c) * 100
         st.markdown(f"""
         <div class='flex-center' style='background: #fef2f2; padding: 20px; border-radius: 12px; border: 1px solid #fee2e2;'>
-            <div class='kpi-label' style='color: #ef4444;'>On Debt <span style='background: #fee2e2; padding: 2px 6px; border-radius: 4px; font-size: 0.7rem;'>{pct_debt:.1f}%</span></div>
+            <div class='kpi-label' style='color: #ef4444;'>Em Dívida <span style='background: #fee2e2; padding: 2px 6px; border-radius: 4px; font-size: 0.7rem;'>{pct_debt:.1f}%</span></div>
             <div class='kpi-value' style='color: #ef4444; font-size: 1.8rem !important;'>{on_debt:,}</div>
         </div>
         """, unsafe_allow_html=True)
@@ -207,20 +207,16 @@ with st.container():
             },
             "yAxis": {
                 "type": "category",
-                "data": ["Clients"],
+                "data": ["Clientes"],
                 "show": False
             },
             "series": [
                 {
-                    "name": "Pre-Debt Collector",
+                    "name": "Pré-Cobrança",
                     "type": "bar",
                     "stack": "total",
                     "label": {
                         "show": True,
-                        # "position": "inside",
-                        # "formatter": f"{pre_debt}",
-                        # "color": "#fff",
-                        # "fontSize": 14,
                         "fontWeight": "bold"
                     },
                     "emphasis": {"focus": "series"},
@@ -228,7 +224,7 @@ with st.container():
                     "data": [pre_debt]
                 },
                 {
-                    "name": "Debt Collector",
+                    "name": "Cobrança Forçada",
                     "type": "bar",
                     "stack": "total",
                     "label": {
@@ -256,9 +252,9 @@ with st.container():
 
 st.markdown("<br>", unsafe_allow_html=True)
 
-# --- Layout: Bills Overview ---
+# --- Layout: Visão Geral de Faturas ---
 with st.container():
-    st.markdown("<div class='section-header'>🧾 Bills Overview <span style='margin-left: auto; color: #94a3b8;'>...</span></div>", unsafe_allow_html=True)
+    st.markdown("<div class='section-header'>🧾 Visão Geral de Faturas <span style='margin-left: auto; color: #94a3b8;'>...</span></div>", unsafe_allow_html=True)
     
     b_col1, b_col2, b_col3 = st.columns([1, 3, 1])
     
@@ -274,11 +270,11 @@ with st.container():
         st.markdown(f"""
         <div class='flex-center' style='gap: 16px;'>
             <div class='flex-center' style='flex-direction: row; gap: 12px; background: white; padding: 12px 20px; border-radius: 12px; border: 1px solid #e2e8f0; width: 100%; justify-content: space-between;'>
-                <div class='kpi-label' style='margin-bottom: 0;'>Expired Total</div>
+                <div class='kpi-label' style='margin-bottom: 0;'>Total Vencido</div>
                 <div class='kpi-value' style='font-size: 1.6rem !important;'>{expired_total:,}</div>
             </div>
             <div class='flex-center' style='flex-direction: row; gap: 12px; background: white; padding: 12px 20px; border-radius: 12px; border: 1px solid #e2e8f0; width: 100%; justify-content: space-between;'>
-                <div class='kpi-label' style='margin-bottom: 0;'>Expired Value</div>
+                <div class='kpi-label' style='margin-bottom: 0;'>Valor Vencido</div>
                 <div class='kpi-value' style='font-size: 1.6rem !important;'>R$ {expired_value:,.2f}</div>
             </div>
         </div>
@@ -298,12 +294,12 @@ with st.container():
             "xAxis": {"type": "value"},
             "yAxis": {
                 "type": "category",
-                "data": ["Bills"],
+                "data": ["Faturas"],
                 "show": False
             },
             "series": [
                 {
-                    "name": "Pre-Debt Collection",
+                    "name": "Pré-Cobrança",
                     "type": "bar",
                     "stack": "total",
                     "label": {"show": True, "fontWeight": "bold"},
@@ -312,7 +308,7 @@ with st.container():
                     "data": [cnt_pre]
                 },
                 {
-                    "name": "Debt Collector",
+                    "name": "Cobrança Forçada",
                     "type": "bar",
                     "stack": "total",
                     "label": {"show": True, "fontWeight": "bold"},
@@ -325,15 +321,15 @@ with st.container():
         st_echarts(options=options, height="140px")
         
     with b_col3:
-        # Colored Pads for Value Breakdown - Vertically Stacked
+        # Blocos coloridos para detalhamento de valor - Empilhados Verticalmente
         st.markdown(f"""
         <div class='flex-center' style='gap: 16px;'>
             <div class='flex-center' style='background: #fffbeb; padding: 12px 20px; border-radius: 12px; border: 1px solid #fde68a; width: 100%;'>
-                <div class='kpi-label' style='color: #92400e; font-size: 0.75rem; margin-bottom: 4px;'>PRE-DEBT</div>
+                <div class='kpi-label' style='color: #92400e; font-size: 0.75rem; margin-bottom: 4px;'>PRÉ-COBRANÇA</div>
                 <div class='kpi-value' style='color: #b45309; font-size: 1.5rem !important;'>R$ {val_pre:,.2f}</div>
             </div>
             <div class='flex-center' style='background: #fef2f2; padding: 12px 20px; border-radius: 12px; border: 1px solid #fee2e2; width: 100%;'>
-                <div class='kpi-label' style='color: #991b1b; font-size: 0.75rem; margin-bottom: 4px;'>DEBT COLLECTOR</div>
+                <div class='kpi-label' style='color: #991b1b; font-size: 0.75rem; margin-bottom: 4px;'>COBRANÇA FORÇADA</div>
                 <div class='kpi-value' style='color: #b91c1c; font-size: 1.5rem !important;'>R$ {val_force:,.2f}</div>
             </div>
         </div>
@@ -341,7 +337,7 @@ with st.container():
 
 st.markdown("<br>", unsafe_allow_html=True)
 
-# --- Layout: Charts ---
+# --- Layout: Gráficos ---
 c1, c2, c3 = st.columns(3)
 
 with c1:
@@ -386,7 +382,7 @@ with c1:
         st.info("No data available")
 
 with c2:
-    st.markdown("<div class='section-header'>🗺️ Bairro (Neighborhood)</div>", unsafe_allow_html=True)
+    st.markdown("<div class='section-header'>🗺️ Bairro</div>", unsafe_allow_html=True)
     bairro_stats = data.get('bill', {}).get('bill_stats', {}).get('bairro', {})
     if bairro_stats:
         df_bairro = pd.DataFrame(list(bairro_stats.items()), columns=['Bairro', 'Count'])
@@ -427,7 +423,7 @@ with c2:
         st.info("No data available")
 
 with c3:
-    st.markdown("<div class='section-header'>⏳ Expired Age (Days)</div>", unsafe_allow_html=True)
+    st.markdown("<div class='section-header'>⏳ Dívida por Atraso (Dias)</div>", unsafe_allow_html=True)
     exp_age_raw = data.get('bill', {}).get('bill_stats', {}).get('expired_age', [])
     
     # expired_age can be a list of dicts (single instance) or a dict (Global view merge)
@@ -474,9 +470,9 @@ with c3:
 
 st.markdown("<br>", unsafe_allow_html=True)
 
-# --- Layout: CDR Overview ---
+# --- Layout: Visão Geral CDR ---
 with st.container():
-    st.markdown("<div class='section-header'>📞 CDR Overview (Call Details)</div>", unsafe_allow_html=True)
+    st.markdown("<div class='section-header'>📞 Visão Geral CDR (Detalhes de Chamadas)</div>", unsafe_allow_html=True)
     
     cdr_col1, cdr_col3, cdr_col2 = st.columns([1, 2.8, 1.2])
     
@@ -492,42 +488,50 @@ with st.container():
     with cdr_col1:
         st.markdown(f"""
         <div class='flex-center' style='white-space: nowrap; background: #f8fafc; padding: 20px; border-radius: 12px; border: 1px solid #e2e8f0; margin-bottom: 12px;'>
-            <div class='kpi-label' style='font-size: 0.8rem;'>Total Calls</div>
+            <div class='kpi-label' style='font-size: 0.8rem;'>Total de Chamadas</div>
             <div class='kpi-value' style='font-size: 1.6rem;'>{cdr_data.get('total_calls', 0):,}</div>
         </div>
         <div class='flex-center' style='white-space: nowrap; background: #f8fafc; padding: 20px; border-radius: 12px; border: 1px solid #e2e8f0;'>
-            <div class='kpi-label' style='font-size: 0.8rem;'>Avg Duration</div>
+            <div class='kpi-label' style='font-size: 0.8rem;'>Duração Média</div>
             <div class='kpi-value' style='font-size: 1.6rem;'>{cdr_data.get('average_duration', 0):.1f}s</div>
         </div>
         """, unsafe_allow_html=True)
 
     with cdr_col2:
         disps = cdr_data.get("dispositions", {})
-        # Define keys to show in order
+        # Define chaves para mostrar em ordem
         disp_keys = ['ANSWERED', 'BUSY', 'FAILED', 'NO ANSWER', 'CONGESTION']
+        disp_labels = {
+            'ANSWERED': 'Atendidas',
+            'BUSY': 'Ocupado',
+            'FAILED': 'Falhou',
+            'NO ANSWER': 'Não Atendidas',
+            'CONGESTION': 'Congestionamento'
+        }
         
         for key in disp_keys:
             val = disps.get(key, 0)
             color = disp_colors.get(key, "#94a3b8")
+            label = disp_labels.get(key, key)
             st.markdown(f"""
             <div class='flex-center' style='background: {color}; padding: 12px 16px; border-radius: 10px; margin-bottom: 10px; border: 1px solid rgba(0,0,0,0.1); height: 50px;'>
                 <div style='color: white; font-size: 1.25rem; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 12px; width: 100%;'>
-                    <span style='font-size: 0.85rem; opacity: 1; text-transform: uppercase; letter-spacing: 0.05em;'>{key} :</span>
+                    <span style='font-size: 0.85rem; opacity: 1; text-transform: uppercase; letter-spacing: 0.05em;'>{label} :</span>
                     <span>{val:,}</span>
                 </div>
             </div>
             """, unsafe_allow_html=True)
 
     with cdr_col3:
-        # Process historical data for Stacked Area Chart
+        # Processar dados históricos para o Gráfico de Área Empilhada
         if hist_metrics:
             df_entries = []
             for h in hist_metrics:
-                # Group by rounded timestamp for cleaner X axis
+                # Agrupar por timestamp arredondado para um eixo X mais limpo
                 ts = h.get("timestamp")
                 if isinstance(ts, str): ts = datetime.fromisoformat(ts)
                 
-                # Round to nearest 10 min window to consolidate global points if needed
+                # Arredondar para janela de 10 min para consolidar pontos globais se necessário
                 ts_key = ts.replace(second=0, microsecond=0)
                 
                 cdr_h = h.get("data", {}).get("cdr_stats", {})
@@ -541,12 +545,12 @@ with st.container():
                 df_hist_graph = df_hist_graph.groupby("timestamp").sum().reset_index()
                 df_hist_graph = df_hist_graph.sort_values("timestamp")
                 
-                # Required Dispositions
+                # Disposições Necessárias
                 series_data = []
                 
                 for key in disp_keys:
                     series_data.append({
-                        "name": key,
+                        "name": disp_labels.get(key, key),
                         "type": "line",
                         "stack": "Total",
                         "areaStyle": {},
@@ -560,7 +564,7 @@ with st.container():
                         "trigger": "axis",
                         "axisPointer": {"type": "cross", "label": {"backgroundColor": "#6a7985"}}
                     },
-                    "legend": {"data": disp_keys},
+                    "legend": {"data": list(disp_labels.values())},
                     "grid": {"left": "3%", "right": "4%", "bottom": "3%", "containLabel": True},
                     "xAxis": [{
                         "type": "category",
@@ -572,12 +576,12 @@ with st.container():
                 }
                 st_echarts(options=options, height="400px")
             else:
-                st.info("No historical CDR data found")
+                st.info("Nenhum dado histórico de CDR encontrado")
         else:
-            st.info("No historical CDR data found")
+            st.info("Nenhum dado histórico de CDR encontrado")
 
 if auto_refresh:
     if Config.DEBUG:
-        logger.info(f"Auto refresh enabled ({selected_instance_name}). Refreshing...")
+        logger.info(f"Atualização automática habilitada ({selected_instance_name}). Atualizando...")
     time.sleep(refresh_interval)
     st.rerun()

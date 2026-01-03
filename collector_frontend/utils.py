@@ -18,13 +18,13 @@ def format_datetime(dt):
     return dt.strftime("%Y-%m-%d %H:%M:%S") if dt else "N/A"
 
 def status_badge(is_active):
-    """Return a colored status badge."""
+    """Retorna um selo de status colorido."""
     if is_active:
-        return "🟢 Active"
-    return "🔴 Inactive"
+        return "🟢 Ativo"
+    return "🔴 Inativo"
 
 def safe_get(data, *keys, default=0):
-    """Safely navigate nested dictionaries."""
+    """Navega com segurança em dicionários aninhados."""
     for key in keys:
         if isinstance(data, dict):
             data = data.get(key, {})
@@ -33,28 +33,28 @@ def safe_get(data, *keys, default=0):
     return data if data != {} else default
 
 def test_mongo_connection(uri, db_name):
-    """Test MongoDB connection and return status."""
+    """Testa a conexão com o MongoDB e retorna o status."""
     try:
         client = MongoClient(uri, serverSelectionTimeoutMS=3000)
         client.server_info()
         db = client[db_name]
-        # Try a simple operation
+        # Tenta uma operação simples
         db.list_collection_names()
-        return True, "✅ Connection successful"
+        return True, "✅ Conexão bem-sucedida"
     except Exception as e:
-        return False, f"❌ Connection failed: {str(e)}"
+        return False, f"❌ Falha na conexão: {str(e)}"
 
 def export_to_json(data, filename):
-    """Create a downloadable JSON file."""
+    """Cria um arquivo JSON para download."""
     json_str = json.dumps(data, indent=2, default=str)
     return json_str.encode('utf-8')
 
-def show_loading(message="Loading..."):
-    """Display a loading spinner."""
+def show_loading(message="Carregando..."):
+    """Exibe um spinner de carregamento."""
     return st.spinner(message)
 
 def confirm_action(message, key=None):
-    """Show a confirmation dialog for destructive actions."""
+    """Mostra uma caixa de confirmação para ações destrutivas."""
     if key:
         return st.checkbox(f"⚠️ {message}", key=key)
     return st.checkbox(f"⚠️ {message}")
