@@ -8,6 +8,8 @@ from datetime import datetime, timedelta
 import time
 from utils import format_currency, safe_get
 from utils_css import apply_light_theme
+from loguru import logger
+from config import Config
 
 st.set_page_config(page_title="Collection Dashboard", layout="wide")
 
@@ -107,15 +109,13 @@ except Exception as e:
 
 # --- Sidebar Controls ---
 st.sidebar.title("⚙️ Dashboard Controls")
-auto_refresh = st.sidebar.checkbox("Auto-Refresh (1m)", value=False)
-
-if auto_refresh:
-    st.sidebar.caption("Last Update: " + datetime.now().strftime("%H:%M:%S"))
-    time.sleep(60)
-    st.rerun()
 
 instances = list(db.instance_config.find({"status.active": True}, {"instance_name": 1, "erp.type": 1}))
-instance_options = ["🌍 Global (All Active)"] + [i["instance_name"] for i in instances]
+if not instances:
+    st.warning("No active instances found.")
+    st.stop()
+
+instance_options = [i["instance_name"] for i in instances]
 selected_instance_name = st.sidebar.selectbox("Select View", instance_options)
 
 def format_time_ago(dt):
@@ -141,101 +141,23 @@ def format_time_ago(dt):
 def get_latest_metrics(full_id):
     return db.metrics.find_one({"instance_full_id": full_id}, sort=[("timestamp", -1)])
 
-def get_historical_metrics(full_id=None, limit=20):
-    if full_id:
-        return list(db.metrics.find({"instance_full_id": full_id}, sort=[("timestamp", -1)], limit=limit))
-    else:
-        # For Global view, we fetch the latest N docs from EACH instance
-        all_hist = []
-        for inst in instances:
-            f_id = f"{inst['instance_name']}-{inst.get('erp',{}).get('type','ixc')}-{str(inst['_id'])}"
-            all_hist.extend(list(db.metrics.find({"instance_full_id": f_id}, sort=[("timestamp", -1)], limit=limit)))
-        return all_hist
+def get_historical_metrics(full_id, limit=20):
+    return list(db.metrics.find({"instance_full_id": full_id}, sort=[("timestamp", -1)], limit=limit))
 
 last_update_ts = None
+inst_doc = next(i for i in instances if i["instance_name"] == selected_instance_name)
+f_id = f"{selected_instance_name}-{inst_doc.get('erp',{}).get('type','ixc')}-{str(inst_doc['_id'])}"
+m = get_latest_metrics(f_id)
 
-if selected_instance_name == "🌍 Global (All Active)":
-    total_metrics = {
-        "clients": {"total": 0, "count_with_open_debt": 0, "count_pre_force_debt_collection": 0, "count_force_debt_collection": 0},
-        "bill": {"total": 0, "expired": 0, "count_pre_force_debt_collection": 0, "value_pre_force_debt_collection": 0.0, "count_force_debt_collection": 0, "value_force_debt_collection": 0.0, "bill_stats": {}},
-        "actions_today": {"dialer_triggers": 0},
-        "cdr_stats": {"total_calls": 0, "average_duration": 0.0, "dispositions": {}}
-    }
-    
-    avg_durations = []
-    
-    for inst in instances:
-        f_id = f"{inst['instance_name']}-{inst.get('erp',{}).get('type','ixc')}-{str(inst['_id'])}"
-        m = get_latest_metrics(f_id)
-        if m and "data" in m:
-            ts = m.get("timestamp")
-            if ts and (not last_update_ts or ts > last_update_ts):
-                last_update_ts = ts
-                
-            d = m["data"]
-            c = d.get("clients", {})
-            total_metrics["clients"]["total"] += c.get("total", 0)
-            total_metrics["clients"]["count_with_open_debt"] += c.get("count_with_open_debt", 0)
-            total_metrics["clients"]["count_pre_force_debt_collection"] += c.get("count_pre_force_debt_collection", 0)
-            total_metrics["clients"]["count_force_debt_collection"] += c.get("count_force_debt_collection", 0)
-
-            b = d.get("bill") if "bill" in d else d.get("bills", {})
-            total_metrics["bill"]["total"] += b.get("total", 0)
-            total_metrics["bill"]["expired"] += b.get("expired", 0)
-            total_metrics["bill"]["count_pre_force_debt_collection"] += b.get("count_pre_force_debt_collection", 0)
-            total_metrics["bill"]["value_pre_force_debt_collection"] += b.get("value_pre_force_debt_collection", 0.0)
-            total_metrics["bill"]["count_force_debt_collection"] += b.get("count_force_debt_collection", 0)
-            total_metrics["bill"]["value_force_debt_collection"] += b.get("value_force_debt_collection", 0.0)
-            
-            # Merge bill_stats for Global
-            b_stats = b.get("bill_stats", {})
-            for key in ["tipo_cliente", "bairro"]:
-                if key in b_stats:
-                    if key not in total_metrics["bill"]["bill_stats"]:
-                        total_metrics["bill"]["bill_stats"][key] = {}
-                    for subkey, val in b_stats[key].items():
-                        total_metrics["bill"]["bill_stats"][key][subkey] = total_metrics["bill"]["bill_stats"][key].get(subkey, 0) + val
-
-            # Merge expired_age
-            expired_age_list = b.get("bill_stats", {}).get("expired_age", [])
-            if expired_age_list:
-                if "expired_age" not in total_metrics["bill"]["bill_stats"]:
-                    total_metrics["bill"]["bill_stats"]["expired_age"] = {}
-                for item in expired_age_list:
-                    age_id = str(item.get("_id"))
-                    count = item.get("count", 0)
-                    total_metrics["bill"]["bill_stats"]["expired_age"][age_id] = total_metrics["bill"]["bill_stats"]["expired_age"].get(age_id, 0) + count
-
-            total_metrics["actions_today"]["dialer_triggers"] += d.get("actions_today", {}).get("dialer_triggers", 0)
-
-            # Merge CDR stats
-            cdr = d.get("cdr_stats", {})
-            total_metrics["cdr_stats"]["total_calls"] += cdr.get("total_calls", 0)
-            if "average_duration" in cdr:
-                avg_durations.append(cdr["average_duration"])
-            
-            dispositions = cdr.get("dispositions", {})
-            for disp, count in dispositions.items():
-                total_metrics["cdr_stats"]["dispositions"][disp] = total_metrics["cdr_stats"]["dispositions"].get(disp, 0) + count
-    
-    if avg_durations:
-        total_metrics["cdr_stats"]["average_duration"] = sum(avg_durations) / len(avg_durations)
-    
-    data = total_metrics
-    hist_metrics = get_historical_metrics(limit=24) # ~24h if hourly
+if m:
+    last_update_ts = m.get("timestamp")
+    data = m["data"]
+    if "bill" not in data and "bills" in data:
+        data["bill"] = data["bills"]
+    hist_metrics = get_historical_metrics(f_id, limit=24)
 else:
-    inst_doc = next(i for i in instances if i["instance_name"] == selected_instance_name)
-    f_id = f"{selected_instance_name}-{inst_doc.get('erp',{}).get('type','ixc')}-{str(inst_doc['_id'])}"
-    m = get_latest_metrics(f_id)
-    if m:
-        last_update_ts = m.get("timestamp")
-        data = m["data"]
-        if "bill" not in data and "bills" in data:
-            data["bill"] = data["bills"]
-        hist_metrics = get_historical_metrics(f_id, limit=24)
-    else:
-        data = {}
-        hist_metrics = []
+    data = {}
+    hist_metrics = []
 
 # --- Layout: Header ---
 # col_h1, col_h2 = st.columns([8, 2])
@@ -252,7 +174,25 @@ else:
 # --- Layout: Clients ---
 with st.container():
     time_ago = format_time_ago(last_update_ts)
-    st.markdown(f"<div class='section-header'>👤 Clients <span style='margin-left: auto; font-size: 0.75rem; background: #dbeafe; color: #1e40af; padding: 2px 8px; border-radius: 4px;'>Updated {time_ago}</span></div>", unsafe_allow_html=True)
+    
+    # Header with Controls
+    col_title, col_ctrl = st.columns([1.5, 1])
+    with col_title:
+        st.markdown(f"<div class='section-header' style='margin-bottom: 0;'>👤 Clients <span style='color: #64748b; font-weight: 400; font-size: 0.9rem; margin-left: 10px;'>({selected_instance_name})</span></div>", unsafe_allow_html=True)
+    with col_ctrl:
+        # Mini-controls row
+        c1, c2 = st.columns([1.5, 1])
+        
+        # Fixed refresh behavior
+        auto_refresh = True
+        refresh_interval = 60
+        
+        with c1:
+            st.markdown(f"<div class='ctrl-box-last'>Last: {last_update_ts.strftime('%H:%M:%S') if last_update_ts else 'N/A'}</div>", unsafe_allow_html=True)
+        with c2:
+            st.markdown(f"<div class='ctrl-box-time'>{time_ago}</div>", unsafe_allow_html=True)
+
+    st.markdown("<div style='margin-bottom: 20px;'></div>", unsafe_allow_html=True)
     
     c_col1, c_col2, c_col3 = st.columns([1, 1.5, 3])
     
@@ -526,12 +466,20 @@ with c3:
     else:
         df_age = pd.DataFrame(exp_age_raw)
         if not df_age.empty:
-            df_age = df_age.rename(columns={'_id': 'Age'})
+            df_age = df_age.rename(columns={'_id': 'Age', 'count': 'Count'})
     
     if not df_age.empty:
-        df_age['Age'] = df_age['Age'].astype(int)
-        df_age = df_age.sort_values('Count', ascending=False).head(8)
-        df_age = df_age.sort_values('Age') # Sort by age for logical X axis
+        # Robustly find count/Count column
+        count_col = next((c for c in df_age.columns if c.lower() == 'count'), None)
+        if count_col:
+            df_age = df_age.rename(columns={count_col: 'Count'})
+        
+        if 'Age' in df_age.columns:
+            df_age['Age'] = df_age['Age'].astype(int)
+        
+        if 'Count' in df_age.columns:
+            df_age = df_age.sort_values('Count', ascending=False).head(8)
+            df_age = df_age.sort_values('Age') if 'Age' in df_age.columns else df_age
         
         options = {
             "tooltip": {"trigger": "axis"},
@@ -642,3 +590,9 @@ with st.container():
                 st.info("No historical CDR data found")
         else:
             st.info("No historical CDR data found")
+
+if auto_refresh:
+    if Config.DEBUG:
+        logger.info(f"Auto refresh enabled ({selected_instance_name}). Refreshing...")
+    time.sleep(refresh_interval)
+    st.rerun()

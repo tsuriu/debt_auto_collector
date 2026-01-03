@@ -160,7 +160,9 @@ def apply_light_theme():
             border-radius: 8px !important;
         }
         [data-baseweb="select"] span,
-        .stSelectbox span {
+        .stSelectbox span,
+        [data-testid="stSidebar"] [data-baseweb="select"] span,
+        [data-testid="stSidebar"] .stSelectbox span {
             color: #0f172a !important;
         }
         
@@ -263,6 +265,43 @@ def apply_light_theme():
             box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08) !important;
             border: 1px solid #e2e8f0 !important;
             margin-bottom: 1.5rem !important;
+        }
+        
+        /* Sidebar Selectbox Text Color - Extra Specific */
+        [data-testid="stSidebar"] [data-baseweb="select"] div,
+        [data-testid="stSidebar"] [data-baseweb="select"] span,
+        [data-testid="stSidebar"] div[data-baseweb="select"] * {
+            color: #0f172a !important;
+        }
+
+        /* Header Control Boxes */
+        .ctrl-box-last {
+            background: #f1f5f9 !important;
+            color: #475569 !important;
+            padding: 6px 16px !important;
+            border-radius: 6px !important;
+            font-size: 0.75rem !important;
+            font-weight: 700 !important;
+            text-align: center !important;
+            border: 1px solid #e2e8f0 !important;
+        }
+        .ctrl-box-time {
+            background: #dbeafe !important;
+            color: #1e40af !important;
+            padding: 6px 16px !important;
+            border-radius: 6px !important;
+            font-size: 0.75rem !important;
+            font-weight: 800 !important;
+            text-align: center !important;
+            border: 1px solid #bfdbfe !important;
+        }
+
+        /* Toggle Button - Red when active */
+        .stToggle > div[data-testid="stWidgetLabel"] p {
+            font-weight: 600 !important;
+        }
+        div[data-testid="stCheckboxToggle"] div[role="switch"][aria-checked="true"] {
+            background-color: #ef4444 !important;
         }
     </style>
     """, unsafe_allow_html=True)

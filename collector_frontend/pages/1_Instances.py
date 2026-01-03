@@ -3,7 +3,7 @@ import pandas as pd
 from db import get_db
 from bson import ObjectId
 from datetime import datetime
-from utils import status_badge, export_to_json, confirm_action
+from utils import status_badge, export_to_json, confirm_action, safe_get
 from utils_css import apply_light_theme
 
 st.set_page_config(page_title="Manage Instances", layout="wide")
@@ -151,7 +151,7 @@ with tab1:
                         with r_col3:
                             new_dial_int = st.number_input("Dial Interval (min)", value=chg.get('dial_interval', 4))
                         with r_col4:
-                            new_dial_day = st.number_input("Dials per Day", value=chg.get('dial_per_day', 3))
+                            new_dial_day = st.number_input("Dials per Day", value=safe_get(chg, 'dial_per_day', 3))
 
                         st.markdown("<br>", unsafe_allow_html=True)
                         if st.form_submit_button("💾 Save Configuration Changes", use_container_width=True, type="primary"):
