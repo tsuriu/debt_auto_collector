@@ -19,18 +19,7 @@ apply_light_theme()
 # Additional Dashboard-specific CSS
 st.markdown("""
 <style>
-    /* KPI Styling */
-    .kpi-label {
-        font-size: 0.875rem !important;
-        color: #64748b !important;
-        font-weight: 600 !important;
-        margin-bottom: 4px !important;
-    }
-    .kpi-value {
-        font-size: 2.25rem !important;
-        font-weight: 700 !important;
-        color: #0f172a !important;
-    }
+    /* Trend indicators */
     .kpi-trend {
         font-size: 0.75rem !important;
         font-weight: 600 !important;
@@ -62,38 +51,11 @@ st.markdown("""
         border-radius: 9999px !important;
     }
     
-    /* Section Headers */
-    .section-header {
-        display: flex !important;
-        align-items: center !important;
-        gap: 8px !important;
-        margin-bottom: 20px !important;
-        color: #1e293b !important;
-        font-weight: 700 !important;
-        font-size: 1.125rem !important;
-    }
-    
-    /* Table Styling */
+    /* Custom Table fallback */
     .custom-table {
         width: 100% !important;
         border-collapse: collapse !important;
         background-color: white !important;
-    }
-    .custom-table th {
-        background-color: #f8fafc !important;
-        color: #64748b !important;
-        text-transform: uppercase !important;
-        font-size: 0.75rem !important;
-        letter-spacing: 0.05em !important;
-        padding: 12px !important;
-        text-align: left !important;
-        border-bottom: 2px solid #e2e8f0 !important;
-    }
-    .custom-table td {
-        padding: 12px !important;
-        border-bottom: 1px solid #f1f5f9 !important;
-        font-size: 0.875rem !important;
-        color: #334155 !important;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -141,8 +103,14 @@ def format_time_ago(dt):
 def get_latest_metrics(full_id):
     return db.metrics.find_one({"instance_full_id": full_id}, sort=[("timestamp", -1)])
 
-def get_historical_metrics(full_id, limit=20):
-    return list(db.metrics.find({"instance_full_id": full_id}, sort=[("timestamp", -1)], limit=limit))
+def get_historical_metrics(full_id, limit=100):
+    # Filter for data from today only (00:00:00 onwards)
+    today_start = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+    query = {
+        "instance_full_id": full_id,
+        "timestamp": {"$gte": today_start}
+    }
+    return list(db.metrics.find(query, sort=[("timestamp", -1)], limit=limit))
 
 last_update_ts = None
 inst_doc = next(i for i in instances if i["instance_name"] == selected_instance_name)
@@ -198,8 +166,10 @@ with st.container():
     
     with c_col1:
         st.markdown(f"""
-        <div class='kpi-label'>Active Total <span class='kpi-trend trend-up'>📈 +2.4%</span></div>
-        <div class='kpi-value'>{data.get('clients', {}).get('total', 0):,}</div>
+        <div class='flex-center'>
+            <div class='kpi-label'>Active Total <span class='kpi-trend trend-up'>📈 +2.4%</span></div>
+            <div class='kpi-value' style='font-size: 1.8rem !important;'>{data.get('clients', {}).get('total', 0):,}</div>
+        </div>
         """, unsafe_allow_html=True)
         
     with c_col2:
@@ -207,9 +177,9 @@ with st.container():
         total_c = data.get('clients', {}).get('total', 1)
         pct_debt = (on_debt / total_c) * 100
         st.markdown(f"""
-        <div style='background: #fef2f2; padding: 20px; border-radius: 12px; height: 100%; border: 1px solid #fee2e2;'>
-            <div class='kpi-label' style='color: #ef4444;'>On Debt <span style='float: right; background: #fee2e2; padding: 2px 6px; border-radius: 4px;'>{pct_debt:.1f}%</span></div>
-            <div class='kpi-value' style='color: #ef4444;'>{on_debt:,}</div>
+        <div class='flex-center' style='background: #fef2f2; padding: 20px; border-radius: 12px; border: 1px solid #fee2e2;'>
+            <div class='kpi-label' style='color: #ef4444;'>On Debt <span style='background: #fee2e2; padding: 2px 6px; border-radius: 4px; font-size: 0.7rem;'>{pct_debt:.1f}%</span></div>
+            <div class='kpi-value' style='color: #ef4444; font-size: 1.8rem !important;'>{on_debt:,}</div>
         </div>
         """, unsafe_allow_html=True)
         
@@ -290,7 +260,7 @@ st.markdown("<br>", unsafe_allow_html=True)
 with st.container():
     st.markdown("<div class='section-header'>🧾 Bills Overview <span style='margin-left: auto; color: #94a3b8;'>...</span></div>", unsafe_allow_html=True)
     
-    b_col1, b_col2, b_col3 = st.columns([2.5, 6, 4.5])
+    b_col1, b_col2, b_col3 = st.columns([1, 3, 1])
     
     expired_total = data.get('bill', {}).get('expired', 0)
     val_pre = data.get('bill', {}).get('value_pre_force_debt_collection', 0)
@@ -302,28 +272,28 @@ with st.container():
 
     with b_col1:
         st.markdown(f"""
-        <div style='display: flex; gap: 32px;'>
-            <div>
-                <div class='kpi-label'>Expired Total</div>
-                <div class='kpi-value' style='font-size: 1.5rem !important;'>{expired_total:,}</div>
+        <div class='flex-center' style='gap: 16px;'>
+            <div class='flex-center' style='flex-direction: row; gap: 12px; background: white; padding: 12px 20px; border-radius: 12px; border: 1px solid #e2e8f0; width: 100%; justify-content: space-between;'>
+                <div class='kpi-label' style='margin-bottom: 0;'>Expired Total</div>
+                <div class='kpi-value' style='font-size: 1.6rem !important;'>{expired_total:,}</div>
             </div>
-            <div>
-                <div class='kpi-label'>Expired Value</div>
-                <div class='kpi-value' style='font-size: 1.5rem !important;'>R$ {expired_value:,.2f}</div>
+            <div class='flex-center' style='flex-direction: row; gap: 12px; background: white; padding: 12px 20px; border-radius: 12px; border: 1px solid #e2e8f0; width: 100%; justify-content: space-between;'>
+                <div class='kpi-label' style='margin-bottom: 0;'>Expired Value</div>
+                <div class='kpi-value' style='font-size: 1.6rem !important;'>R$ {expired_value:,.2f}</div>
             </div>
         </div>
         """, unsafe_allow_html=True)
         
     with b_col2:
-        # ECharts Stacked Horizontal Bar for Bill Counts - This is now the "Big Item"
+        # ECharts Stacked Horizontal Bar for Bill Counts
         options = {
             "tooltip": {
                 "trigger": "axis",
                 "axisPointer": {"type": "shadow"}
             },
-            "legend": {},
+            "legend": {"bottom": 0},
             "grid": {
-                "left": 0, "right": 0, "top": 10, "bottom": 0,
+                "left": 10, "right": 20, "top": 10, "bottom": 30, "containLabel": True
             },
             "xAxis": {"type": "value"},
             "yAxis": {
@@ -352,19 +322,19 @@ with st.container():
                 }
             ]
         }
-        st_echarts(options=options, height="100px")
+        st_echarts(options=options, height="140px")
         
     with b_col3:
-        # Colored Pads for Value Breakdown - Side-by-Side - Adjusted padding
+        # Colored Pads for Value Breakdown - Vertically Stacked
         st.markdown(f"""
-        <div style='display: flex; gap: 8px;'>
-            <div style='flex: 1; background: #fffbeb; padding: 12px; border-radius: 12px; border: 1px solid #fde68a;'>
-                <div class='kpi-label' style='color: #92400e; font-size: 0.7rem;'>Pre-Debt</div>
-                <div class='kpi-value' style='color: #b45309; font-size: 1.25rem !important;'>R$ {val_pre:,.2f}</div>
+        <div class='flex-center' style='gap: 16px;'>
+            <div class='flex-center' style='background: #fffbeb; padding: 12px 20px; border-radius: 12px; border: 1px solid #fde68a; width: 100%;'>
+                <div class='kpi-label' style='color: #92400e; font-size: 0.75rem; margin-bottom: 4px;'>PRE-DEBT</div>
+                <div class='kpi-value' style='color: #b45309; font-size: 1.5rem !important;'>R$ {val_pre:,.2f}</div>
             </div>
-            <div style='flex: 1; background: #fef2f2; padding: 12px; border-radius: 12px; border: 1px solid #fee2e2;'>
-                <div class='kpi-label' style='color: #991b1b; font-size: 0.7rem;'>Debt Collector</div>
-                <div class='kpi-value' style='color: #b91c1c; font-size: 1.25rem !important;'>R$ {val_force:,.2f}</div>
+            <div class='flex-center' style='background: #fef2f2; padding: 12px 20px; border-radius: 12px; border: 1px solid #fee2e2; width: 100%;'>
+                <div class='kpi-label' style='color: #991b1b; font-size: 0.75rem; margin-bottom: 4px;'>DEBT COLLECTOR</div>
+                <div class='kpi-value' style='color: #b91c1c; font-size: 1.5rem !important;'>R$ {val_force:,.2f}</div>
             </div>
         </div>
         """, unsafe_allow_html=True)
@@ -508,23 +478,47 @@ st.markdown("<br>", unsafe_allow_html=True)
 with st.container():
     st.markdown("<div class='section-header'>📞 CDR Overview (Call Details)</div>", unsafe_allow_html=True)
     
-    cdr_col1, cdr_col2 = st.columns([1, 4])
+    cdr_col1, cdr_col3, cdr_col2 = st.columns([1, 2.8, 1.2])
     
     cdr_data = data.get("cdr_stats", {})
+    disp_colors = {
+        'ANSWERED': '#10b981', 
+        'BUSY': '#f59e0b', 
+        'FAILED': '#ef4444', 
+        'NO ANSWER': '#6366f1', 
+        'CONGESTION': '#94a3b8'
+    }
     
     with cdr_col1:
         st.markdown(f"""
-        <div style='background: #f8fafc; padding: 20px; border-radius: 12px; border: 1px solid #e2e8f0; margin-bottom: 12px;'>
-            <div class='kpi-label'>Total Calls</div>
-            <div class='kpi-value'>{cdr_data.get('total_calls', 0):,}</div>
+        <div class='flex-center' style='white-space: nowrap; background: #f8fafc; padding: 20px; border-radius: 12px; border: 1px solid #e2e8f0; margin-bottom: 12px;'>
+            <div class='kpi-label' style='font-size: 0.8rem;'>Total Calls</div>
+            <div class='kpi-value' style='font-size: 1.6rem;'>{cdr_data.get('total_calls', 0):,}</div>
         </div>
-        <div style='background: #f8fafc; padding: 20px; border-radius: 12px; border: 1px solid #e2e8f0;'>
-            <div class='kpi-label'>Avg Duration</div>
-            <div class='kpi-value'>{cdr_data.get('average_duration', 0):.1f}s</div>
+        <div class='flex-center' style='white-space: nowrap; background: #f8fafc; padding: 20px; border-radius: 12px; border: 1px solid #e2e8f0;'>
+            <div class='kpi-label' style='font-size: 0.8rem;'>Avg Duration</div>
+            <div class='kpi-value' style='font-size: 1.6rem;'>{cdr_data.get('average_duration', 0):.1f}s</div>
         </div>
         """, unsafe_allow_html=True)
 
     with cdr_col2:
+        disps = cdr_data.get("dispositions", {})
+        # Define keys to show in order
+        disp_keys = ['ANSWERED', 'BUSY', 'FAILED', 'NO ANSWER', 'CONGESTION']
+        
+        for key in disp_keys:
+            val = disps.get(key, 0)
+            color = disp_colors.get(key, "#94a3b8")
+            st.markdown(f"""
+            <div class='flex-center' style='background: {color}; padding: 12px 16px; border-radius: 10px; margin-bottom: 10px; border: 1px solid rgba(0,0,0,0.1); height: 50px;'>
+                <div style='color: white; font-size: 1.25rem; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 12px; width: 100%;'>
+                    <span style='font-size: 0.85rem; opacity: 1; text-transform: uppercase; letter-spacing: 0.05em;'>{key} :</span>
+                    <span>{val:,}</span>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+
+    with cdr_col3:
         # Process historical data for Stacked Area Chart
         if hist_metrics:
             df_entries = []
@@ -548,16 +542,7 @@ with st.container():
                 df_hist_graph = df_hist_graph.sort_values("timestamp")
                 
                 # Required Dispositions
-                disp_keys = ['ANSWERED', 'BUSY', 'FAILED', 'NO ANSWER', 'CONGESTION']
                 series_data = []
-                # Define distinct colors for each disposition
-                disp_colors = {
-                    'ANSWERED': '#10b981', 
-                    'BUSY': '#f59e0b', 
-                    'FAILED': '#ef4444', 
-                    'NO ANSWER': '#6366f1', 
-                    'CONGESTION': '#94a3b8'
-                }
                 
                 for key in disp_keys:
                     series_data.append({

@@ -266,6 +266,43 @@ def apply_light_theme():
             border: 1px solid #e2e8f0 !important;
             margin-bottom: 1.5rem !important;
         }
+
+        .kpi-label {
+            font-size: 0.85rem !important;
+            font-weight: 600 !important;
+            color: #64748b !important;
+            margin-bottom: 4px !important;
+            text-align: center !important;
+            text-transform: uppercase !important;
+            letter-spacing: 0.025em !important;
+        }
+        .kpi-value {
+            font-size: 1.85rem !important;
+            font-weight: 800 !important;
+            color: #0f172a !important;
+            text-align: center !important;
+            line-height: 1.2 !important;
+        }
+        
+        .section-header {
+            font-size: 1.1rem !important;
+            font-weight: 700 !important;
+            color: #1e293b !important;
+            margin-bottom: 20px !important;
+            padding-bottom: 8px !important;
+            border-bottom: 2px solid #e2e8f0 !important;
+            display: flex !important;
+            align-items: center !important;
+            gap: 8px !important;
+        }
+
+        .flex-center {
+            display: flex !important;
+            flex-direction: column !important;
+            align-items: center !important;
+            justify-content: center !important;
+            text-align: center !important;
+        }
         
         /* Sidebar Selectbox Text Color - Extra Specific */
         [data-testid="stSidebar"] [data-baseweb="select"] div,

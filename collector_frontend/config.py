@@ -12,5 +12,3 @@ class Config:
         DEBUG = raw_debug.lower() == "true"
     else:
         DEBUG = bool(raw_debug)
-
-    logger.debug(f"DEBUG: {DEBUG}")
