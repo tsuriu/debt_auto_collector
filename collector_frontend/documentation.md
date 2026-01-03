@@ -26,18 +26,21 @@ collector_frontend/
 ## Key Features
 
 ### 1. Unified Dashboard (`2_Dashboard.py`)
-Provides a comprehensive overview of the operation across three main domains:
-- **Clients**: Total active clients vs. clients with open debt, using interactive horizontal stack charts.
-- **Bills Overview**: Detailed breakdown of expired bill counts and values, categorized by collection rules (Pre-Debt vs. Debt Collector).
-- **Categorized Charts**: Vertical bar graphs for **Client Type**, **Neighborhood**, and **Debt Aging (Expired Age)**, limited to the top 8 elements for clarity.
-- **CDR Overview**: Real-time telephony performance metrics:
-    - **KPIs**: Total calls and average duration (seconds).
-    - **Disposition Trend**: A high-fidelity Stacked Area Chart (ECharts) visualizing call outcomes (ANSWERED, BUSY, FAILED, NO ANSWER, CONGESTION) over time.
-- **Global View**: Automatically aggregates and merges metrics from all active instances into a single unified workspace.
+Provides a comprehensive overview of the operation with a focus on **Today's Status**:
+- **Clients**: Total active clients vs. clients with open debt. Features specialized horizontal stack charts and centralized KPI cards.
+- **Bills Overview**: 
+    - **Proportional Layout**: Expanded center area for the Bill Counts bar graph.
+    - **Stacked Breakdown**: Pre-Debt and Debt Collector value cards are vertically stacked for optimal readability.
+    - **Single-Line Format**: Primary expired KPIs (Total and Value) use a streamlined horizontal `LABEL : VALUE` format.
+- **CDR Overview**: Telephony performance metrics for the **Current Day**:
+    - **Daily Filter**: All metrics and historical trends are automatically filtered to show data only for the current calendar day (from 00:00:00).
+    - **Disposition Redesign**: Outcome counts are displayed in color-coded, single-line horizontal boxes with the format `DISPOSITION : VALUE`.
+    - **Disposition Trend**: A high-fidelity Stacked Area Chart (ECharts) visualizing outcome trends throughout the day.
+- **Auto-Refresh**: The dashboard is hardcoded to refresh every **60 seconds**, ensuring real-time relevance without manual configuration.
 
 ### 2. Instance Management (`1_Instances.py`)
 Allows for granular control over individual customer instances:
-- **Categorized Form**: UI organized into logical sections (General, ERP, Asterisk/AMI, CDR Database, Collection Rules).
+- **Categorized Form**: UI organized into logical sections (General, ERP, Asterisk/AMI, CDR Database, Collection Rules). Dashboard-specific controls are globally managed and removed from instance forms.
 - **ERP Type Support**: Dropdown selection for multiple ERP integrations (**ixc**, **rbx**, **altarede**).
 - **JSON Editor Toggle**: Advanced users can switch between the form view and a raw JSON editor for bulk configuration changes.
 - **Instance Creation**: Standardized form for onboarding new instances with all required technical and business parameters.

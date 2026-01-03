@@ -38,9 +38,11 @@ The fastest way to run the entire stack is via Docker Compose:
 - **Metric Snapshots**: Generates periodic data points for deep historical analysis.
 
 ### Interactive Dashboard (`collector_frontend`)
-- **Real-time Monitoring**: Comprehensive KPIs for active clients, debt volume, and collection value.
+- **Real-time Monitoring**: Comprehensive KPIs for active clients, debt volume, and daily collection status.
+- **Automated Refresh**: Hardcoded 60-second auto-refresh for consistent real-time monitoring.
+- **Daily Focus**: All historical charts and trends are automatically filtered to show metrics for the **current day**.
 - **Advanced Visualizations**:
-    - **CDR Overview**: Stacked area charts for call dispositions and performance KPIs.
+    - **CDR Overview**: Redesigned disposition grid with color-coded horizontal stats and daily trend charts.
     - **Categorized Charts**: Vertical Bar graphs for demographic and debt aging analysis.
 - **Robust Configuration**:
     - A categorized form-based editor for instance management.
