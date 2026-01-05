@@ -149,7 +149,7 @@ class Processor:
                 tid = t.get('id')
                 name = t.get('tipo_cliente')
                 if tid and name:
-                    type_map[tid] = name
+                    type_map[str(tid)] = name
 
         merged_charges = []
         
@@ -182,7 +182,7 @@ class Processor:
             merged_bill = bill.copy()
             # Resolve Client Type Name
             type_id = client.get('id_tipo_cliente')
-            type_name = type_map.get(type_id, type_id) if type_id else ''
+            type_name = type_map.get(str(type_id), type_id) if type_id else ''
 
             merged_bill.update({
                 "telefone_celular": client.get('telefone_celular', ''),
