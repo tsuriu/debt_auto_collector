@@ -532,6 +532,14 @@ def main():
     if args.job == "service":
         logger.info("Auto Debt Collector Service Started (Daemon Mode)")
         
+        # Ensure client_types has data
+        try:
+            if Database().get_db().client_types.count_documents({}) == 0:
+                logger.info("Initializing empty 'client_types' collection...")
+                run_client_types_update_job()
+        except Exception as e:
+            logger.error(f"Failed to initialize client_types: {e}")
+        
         # Schedule definitions
         schedule.every().day.at("07:00").do(run_clients_update_job)
         schedule.every(1).hours.do(run_bills_update_job)
@@ -552,6 +560,7 @@ def main():
             logger.warning("DEBUG MODE: Running all jobs immediately for verification")
             try:
                 run_clients_update_job()
+                run_client_types_update_job()
                 run_bills_update_job()
                 run_reports_update_job()
                 run_dialer_job()

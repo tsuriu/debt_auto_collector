@@ -12,8 +12,10 @@ class Processor:
     def _to_int(self, val):
         if isinstance(val, int):
             return val
-        if isinstance(val, str) and val.isdigit():
-            return int(val)
+        if isinstance(val, str):
+            val = val.strip()
+            if val.isdigit():
+                return int(val)
         return val
 
     def _to_date(self, date_str):
