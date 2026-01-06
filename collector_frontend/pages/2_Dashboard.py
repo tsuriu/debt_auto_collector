@@ -482,7 +482,7 @@ with st.container():
         'BUSY': '#f59e0b', 
         'FAILED': '#ef4444', 
         'NO ANSWER': '#6366f1', 
-        'NO ANSWER MACHINE': '#6366f1', 
+        'NO ANSWER MACHINE': '#818cf8', # Correlated but lighter 
         'CONGESTION': '#94a3b8'
     }
     
@@ -561,6 +561,8 @@ with st.container():
                         "itemStyle": {"color": disp_colors.get(key, "#ccc")}
                     })
                 
+                y_max = cdr_data.get('total_calls', 0) + 5
+                
                 options = {
                     "tooltip": {
                         "trigger": "axis",
@@ -573,7 +575,7 @@ with st.container():
                         "boundaryGap": False,
                         "data": df_hist_graph["timestamp"].dt.strftime("%H:%M").tolist()
                     }],
-                    "yAxis": [{"type": "value"}],
+                    "yAxis": [{"type": "value", "max": y_max}],
                     "series": series_data
                 }
                 st_echarts(options=options, height="400px")
