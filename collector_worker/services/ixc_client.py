@@ -41,7 +41,8 @@ class IxcClient:
         
         while True:
             query_params['page'] = str(page)
-            query_params['rp'] = str(self.default_page_size)
+            if 'rp' not in query_params:
+                query_params['rp'] = str(self.default_page_size)
             
             self._rate_limit()
             
@@ -113,6 +114,21 @@ class IxcClient:
             ])
         }
         return self.fetch_all("fn_areceber", query_params)
+    
+    def get_blocked_contracts(self):
+        query_params = {
+            "qtype": "cliente_contrato.status", 
+            "query": "A", 
+            "oper": "=",
+            "rp": "600", 
+            "sortname": "cliente_contrato.id", 
+            "sortorder": "asc",
+            "grid_param": json.dumps([
+                {"TB":"cliente_contrato.id_filial","OP":"!=","P":"3"},
+                {"TB":"cliente_contrato.status_internet","OP":"!=","P":"A"}
+            ])
+        }
+        return self.fetch_all("cliente_contrato", query_params)
 
     def get_client_types(self):
         query_params = {

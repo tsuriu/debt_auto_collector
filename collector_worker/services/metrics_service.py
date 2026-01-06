@@ -239,7 +239,29 @@ class MetricsService:
                     if disp:
                         cdr_metrics["dispositions"][disp] = cdr_metrics["dispositions"].get(disp, 0) + 1
 
-            # 5. Construct Metric Document
+            # 5. Blocked Contracts Metrics
+            blocked_metrics = {
+                "list_by": {}
+            }
+            
+            # Helper to build grouped structure
+            # We need to process "status_internet" and "status_velocidade"
+            target_fields = ["status_internet", "status_velocidade", "contrato"]
+            
+            # Fetch all once
+            all_blocked = list(self.db.blocked_contracts.find({"instance_full_id": self.instance_full_id}, {"_id": 0}))
+            
+            # Group in Python to fill list_by
+            for field in target_fields:
+                grouped = {}
+                for contract in all_blocked:
+                    val = contract.get(field) or "N/A"
+                    if val not in grouped:
+                        grouped[val] = []
+                    grouped[val].append(contract)
+                blocked_metrics["list_by"][field] = grouped
+
+            # 6. Construct Metric Document
             metric_doc = {
                 "instance_full_id": self.instance_full_id,
                 "instance_name": self.instance.get('instance_name'),
@@ -265,7 +287,8 @@ class MetricsService:
                     "actions_today": {
                         "dialer_triggers": triggered_calls
                     },
-                    "cdr_stats": cdr_metrics
+                    "cdr_stats": cdr_metrics,
+                    "blocked_contracts": blocked_metrics
                 }
             }
 

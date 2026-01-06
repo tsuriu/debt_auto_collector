@@ -10,6 +10,7 @@ from services.dialer import Dialer
 from services.report_service import ReportService
 from services.verification import VerificationService
 from services.metrics_service import MetricsService
+from services.blocked_contracts_service import BlockedContractsService
 
 def _get_instance_full_id(instance):
     name = instance.get('instance_name', 'default')
@@ -449,13 +450,25 @@ def run_client_types_update_job():
         except Exception as e:
             logger.error(f"Error in Client Types Job for {instance.get('instance_name')}: {e}")
 
+def run_blocked_contracts_job():
+    logger.info("Starting Job: BLOCKED CONTRACTS")
+    instances = get_active_instances()
+    
+    for instance in instances:
+        try:
+            service = BlockedContractsService(instance)
+            count = service.process()
+            logger.info(f"Blocked Contracts Job finished for {instance.get('instance_name')}. Processed: {count}")
+        except Exception as e:
+            logger.error(f"Error in Blocked Contracts Job for {instance.get('instance_name')}: {e}")
+
 def main():
     import argparse
     
     parser = argparse.ArgumentParser(description="Debt Collector Service")
     parser.add_argument(
         "--job", 
-        choices=["clients", "bills", "dialer", "reports", "service", "metrics", "client_types"], 
+        choices=["clients", "bills", "dialer", "reports", "service", "metrics", "client_types", "blocked_contracts"], 
         default="service",
         help="Run a specific job manually (once) or start the long-running service (default)"
     )
@@ -527,6 +540,10 @@ def main():
         run_client_types_update_job()
         return
 
+    if args.job == "blocked_contracts":
+        run_blocked_contracts_job()
+        return
+
 
     # Service / Scheduler Mode
     if args.job == "service":
@@ -546,6 +563,9 @@ def main():
         # Reports are now triggered 5min after dialer job ends
         # schedule.every(5).minutes.do(run_reports_update_job)
         
+        # Blocked Contracts: every 30 minutes
+        schedule.every(30).minutes.do(run_blocked_contracts_job)
+        
         # Metrics: every 6 hours
         schedule.every(30).minutes.do(run_metrics_job)
         
@@ -563,6 +583,7 @@ def main():
                 run_client_types_update_job()
                 run_bills_update_job()
                 run_reports_update_job()
+                run_blocked_contracts_job()
                 run_dialer_job()
             except Exception as e:
                 logger.critical(f"Startup jobs failed: {e}")
