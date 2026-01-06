@@ -132,7 +132,7 @@ class ReportService:
                 
                 # New Logic: userfield == AMD_MACHINE -> disposition = NO ANSWER
                 if cdr.get("userfield") == "AMD_MACHINE":
-                    cdr["disposition"] = "NO ANSWER"
+                    cdr["disposition"] = "NO ANSWER MACHINE"
 
                 cdr = {k: v for k, v in cdr.items() if k in self.CDR_FIELDS_INDEX}
                 cdr["full_id"] = cdr.pop("src") if "src" in cdr else cdr.get("full_id")

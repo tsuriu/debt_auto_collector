@@ -482,6 +482,7 @@ with st.container():
         'BUSY': '#f59e0b', 
         'FAILED': '#ef4444', 
         'NO ANSWER': '#6366f1', 
+        'NO ANSWER MACHINE': '#6366f1', 
         'CONGESTION': '#94a3b8'
     }
     
@@ -500,12 +501,13 @@ with st.container():
     with cdr_col2:
         disps = cdr_data.get("dispositions", {})
         # Define chaves para mostrar em ordem
-        disp_keys = ['ANSWERED', 'BUSY', 'FAILED', 'NO ANSWER', 'CONGESTION']
+        disp_keys = ['ANSWERED', 'BUSY', 'FAILED', 'NO ANSWER', 'NO ANSWER MACHINE', 'CONGESTION']
         disp_labels = {
             'ANSWERED': 'Atendidas',
             'BUSY': 'Ocupado',
             'FAILED': 'Falhou',
             'NO ANSWER': 'Não Atendidas',
+            'NO ANSWER MACHINE': 'Não Atendidas Máquina',
             'CONGESTION': 'Congestionamento'
         }
         
