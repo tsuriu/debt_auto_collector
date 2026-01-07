@@ -566,18 +566,27 @@ with st.container():
                 options = {
                     "tooltip": {
                         "trigger": "axis",
-                        "axisPointer": {"type": "cross", "label": {"backgroundColor": "#6a7985"}}
+                        "axisPointer": {"type": "shadow"} # Shadow for bars
                     },
                     "legend": {"data": list(disp_labels.values())},
                     "grid": {"left": "3%", "right": "4%", "bottom": "3%", "containLabel": True},
                     "xAxis": [{
                         "type": "category",
-                        "boundaryGap": False,
                         "data": df_hist_graph["timestamp"].dt.strftime("%H:%M").tolist()
                     }],
                     "yAxis": [{"type": "value", "max": y_max}],
                     "series": series_data
                 }
+                
+                # Update series type to bar
+                for s in options["series"]:
+                    s["type"] = "bar"
+                    s["stack"] = "total"
+                    # Remove areaStyle if present
+                    if "areaStyle" in s:
+                        del s["areaStyle"]
+                    s["label"] = {"show": False} # Too crowded for time series usually
+                    
                 st_echarts(options=options, height="400px")
             else:
                 st.info("Nenhum dado histórico de CDR encontrado")
