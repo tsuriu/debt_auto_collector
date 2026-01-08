@@ -328,7 +328,7 @@ if flat_rows:
         df_table, 
         width="stretch", 
         hide_index=True,
-        height=1000,
+        height=800,
         column_config={
             "Data Suspensão": st.column_config.DateColumn("Data Suspensão", format="DD/MM/YYYY")
         }
