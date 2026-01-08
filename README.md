@@ -39,11 +39,12 @@ The fastest way to run the entire stack is via Docker Compose:
 
 ### Interactive Dashboard (`collector_frontend`)
 - **Real-time Monitoring**: Comprehensive KPIs for active clients, debt volume, and daily collection status.
-- **Automated Refresh**: Hardcoded 60-second auto-refresh for consistent real-time monitoring.
+- **Automated Refresh**: Hardcoded 60-second auto-refresh across all dashboard views for consistent real-time monitoring.
 - **Daily Focus**: All historical charts and trends are automatically filtered to show metrics for the **current day**.
+- **Blocked Contracts**: Dedicated dashboard for monitoring suspended services with historical status tracking and detailed contract tables.
 - **Advanced Visualizations**:
     - **CDR Overview**: Redesigned disposition grid with color-coded horizontal stats and daily trend charts.
-    - **Categorized Charts**: Vertical Bar graphs for demographic and debt aging analysis.
+    - **Categorized Charts**: Vertical Bar and Area graphs for demographic, debt aging, and contract status analysis.
 - **Robust Configuration**:
     - A categorized form-based editor for instance management.
     - Dropdown support for multiple ERP types (**ixc**, **rbx**, **altarede**).

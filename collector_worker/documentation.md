@@ -106,11 +106,29 @@ The Service runs on a schedule defined in `main.py`.
     *   **Bill Stats**: Aggregates counts individually by key. `bairro` and `tipo_cliente` are returned as dictionaries `{Name: Count}` after normalization. Other keys return a list of objects.
     *   **Normalization**: Uses `instance.erp.reverse_map.neighborhood` and `instance.erp.reverse_map.tipo_cliente` to normalize names (e.g., merging synonyms) before aggregation.
 3.  **Action Logs**: Counts total dialer actions triggered for the current day.
-4.  **CDR Analytics (`cdr_stats`)**: Uses a MongoDB aggregation pipeline over individual records in `last_reports` for the current day to compute:
-    *   `total_calls`: Total number of CDRs collected today.
-    *   `average_duration`: Mean duration of all calls today.
-    *   `dispositions`: Distribution of call outcomes (e.g., ANSWERED, NO ANSWER).
     *   **Dashboard Visualization**: These metrics are consumed by the **CDR Overview** section in the frontend, featuring a high-fidelity Stacked Area Chart for disposition trends.
+5. **Blocked Contracts Sync (`run_blocked_contracts_job`)**
+**Schedule**: Every 30 minutes
+1.  **Fetch**: Retrieves the list of contracts with suspended or restricted status from IXC.
+2.  **Process**: Normalizes statuses and merges basic client information.
+3.  **Upsert**: Updates the `blocked_contracts` collection in MongoDB.
+4.  **Log**: Records execution stats to `history_action_log`.
+
+6. **Metrics Collection (`run_metrics_job`)**
+**Schedule**: Every 30 minutes
+1.  **Aggregate Clients**: 
+    *   Total clients.
+    *   Clients with open debt.
+    *   **Classification**: Counts for `pre_force_debt_collection` and `force_debt_collection`.
+2.  **Aggregate Bills**: 
+    *   Total and Expired counts.
+    *   **Classification**: Counts and Total Value for `pre_force_debt_collection` and `force_debt_collection`.
+    *   **Bill Stats**: Aggregates counts individually by key. `bairro` and `tipo_cliente` are returned as dictionaries `{Name: Count}` after normalization. Other keys return a list of objects.
+    *   **Normalization**: Uses `instance.erp.reverse_map.neighborhood` and `instance.erp.reverse_map.tipo_cliente` to normalize names (e.g., merging synonyms) before aggregation.
+3.  **Action Logs**: Counts total dialer actions triggered for the current day.
+4.  **CDR Analytics (`cdr_stats`)**: Uses a MongoDB aggregation pipeline over individual records in `last_reports` for the current day to compute:
+    *   `total_calls`, `average_duration`, `dispositions`.
+5.  **Blocked Contracts Analytics**: Groups active suspended service data by connectivity status (`status_internet`) and speed tier (`status_velocidade`) for historical monitoring.
 6.  **Client Types Update (`run_client_types_update_job`)**
 **Schedule**: Weekly (Mondays at 06:00)
 1.  **Fetch**: Retrieves Client Types list from IXC.
@@ -150,7 +168,12 @@ The Service runs on a schedule defined in `main.py`.
 ### `metrics_service.py`
 *   **Purpose**: Strategic data snapshots and performance analytics.
 *   **Key Methods**:
-    *   `collect_metrics()`: Orchestrates multiple database aggregations (clients, bills, history, reports) to create a historical data point. Uses MongoDB aggregation for CDR analytics.
+    *   `collect_metrics()`: Orchestrates multiple database aggregations (clients, bills, history, reports, and blocked contracts) to create a historical data point.
+
+### `blocked_contracts_service.py`
+*   **Purpose**: Specialized service for monitoring suspended services.
+*   **Key Methods**:
+    *   `process()`: Fetches, normalizes, and syncs blocked contract data to MongoDB.
 
 ### `database.py`
 *   **Purpose**: Low-level database operations and schema management.
@@ -207,4 +230,7 @@ python main.py --job dialer --debug
 
 # Run metrics collection manually
 python main.py --job metrics --debug
+
+# Run blocked contracts sync manually
+python main.py --job blocked_contracts --debug
 ```

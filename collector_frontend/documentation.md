@@ -20,7 +20,8 @@ collector_frontend/
 └── pages/
     ├── 1_Instances.py      # Instance Management (CRUD & Config)
     ├── 2_Dashboard.py      # Main Metrics and CDR Overview
-    └── 3_Settings.py       # Global system settings
+    ├── 3_Blocked_Contracts.py # Monitoring of Suspended Services
+    └── 4_Settings.py       # Global system settings
 ```
 
 ## Key Features
@@ -38,7 +39,18 @@ Provides a comprehensive overview of the operation with a focus on **Today's Sta
     - **Disposition Trend**: A high-fidelity Stacked Area Chart (ECharts) visualizing outcome trends throughout the day.
 - **Auto-Refresh**: The dashboard is hardcoded to refresh every **60 seconds**, ensuring real-time relevance without manual configuration.
 
-### 2. Instance Management (`1_Instances.py`)
+### 2. Blocked Contracts (`3_Blocked_Contracts.py`)
+Monitoring and analysis of customers with suspended services:
+- **Metrics Source**: Directly consumes the `blocked_contracts` key from the `metrics` collection.
+- **Historical Charts**:
+    - **Status Velocidade**: Stacked Area Chart showing the trend of speed restriction statuses over time.
+    - **Status Internet**: Stacked Vertical Bar Chart visualizing the distribution of internet connectivity statuses.
+- **Counter Containers**: Color-coded cards reflecting the real-time count for each status type (e.g., Active, Blocked, Limited).
+- **Detailed Inventory**: A single, comprehensive table displaying all blocked contracts with:
+    - `ID Contrato`, `ID Cliente`, `Cliente`, `Status Internet`, `Status Velocidade`, `Data Suspensão`.
+- **Auto-Refresh**: Synchronized with the 60-second system-wide refresh for real-time monitoring.
+
+### 3. Instance Management (`1_Instances.py`)
 Allows for granular control over individual customer instances:
 - **Categorized Form**: UI organized into logical sections (General, ERP, Asterisk/AMI, CDR Database, Collection Rules). Dashboard-specific controls are globally managed and removed from instance forms.
 - **ERP Type Support**: Dropdown selection for multiple ERP integrations (**ixc**, **rbx**, **altarede**).
