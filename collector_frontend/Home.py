@@ -19,7 +19,8 @@ st.markdown("""
 Bem-vindo à interface de gerenciamento do cobrador automático. Use a barra lateral para navegar entre:
 
 - **📋 Instâncias**: Gerencie as configurações de suas instâncias ERP e Asterisk (CRUD).
-- **📊 Dashboard**: Visualize métricas de cobrança, status de dívidas e desempenho do discador.
+- **📊 Dashboard**: Visualize métricas de cobrança, faturas pendentes e desempenho do discador.
+- **🚫 Contratos Bloqueados**: Monitore contratos suspensos ou com restrição de velocidade em tempo real.
 - **⚙️ Configurações**: Atualize as variáveis de ambiente globais do projeto (`.env`).
 """)
 
@@ -70,14 +71,17 @@ with col3:
     
     col_a, col_b = st.columns(2)
     with col_a:
-        if st.button("📋 Instâncias", width="stretch"):
+        if st.button("📋 Instâncias", use_container_width=True):
             st.switch_page("pages/1_Instances.py")
             
-        if st.button("📊 Dashboard", width="stretch"):
+        if st.button("📊 Dashboard", use_container_width=True):
             st.switch_page("pages/2_Dashboard.py")
             
-    with col3:
-        if st.button("⚙️ Configurações", width="stretch"):
+    with col_b:
+        if st.button("🚫 Bloqueados", use_container_width=True):
+            st.switch_page("pages/3_Blocked_Contracts.py")
+
+        if st.button("⚙️ Configurações", use_container_width=True):
             st.switch_page("pages/4_Settings.py")
 
 # Prévia de Atividade Recente
@@ -107,4 +111,4 @@ except Exception as e:
     st.warning("Não foi possível carregar a atividade recente")
 
 st.divider()
-st.caption("💡 Dica: Habilite a atualização automática no Dashboard para modo de monitoramento em TV")
+st.caption("💡 Dica: O sistema possui atualização automática a cada 60 segundos para monitoramento em tempo real.")
