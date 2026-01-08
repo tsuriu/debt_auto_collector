@@ -476,7 +476,7 @@ with st.container():
     
     cdr_col1, cdr_col3, cdr_col2 = st.columns([1, 2.8, 1.2])
     
-    cdr_data = data.get("cdr_stats", {})
+    cdr_data = data.get("cdr_stats", {}) if hist_metrics else {}
     disp_colors = {
         'ANSWERED': '#10b981', 
         'BUSY': '#f59e0b', 
