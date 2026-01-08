@@ -346,7 +346,6 @@ if flat_rows:
 else:
     st.info("Nenhum contrato bloqueado encontrado.")
 
-# Auto refresh logic
-if st.sidebar.checkbox("Auto Refresh (60s)", value=True):
-    time.sleep(60)
-    st.rerun()
+# Auto refresh every 60 seconds
+time.sleep(60)
+st.rerun()
