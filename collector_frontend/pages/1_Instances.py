@@ -154,7 +154,7 @@ with tab1:
                             new_dial_day = st.number_input("Discagens por Dia", value=safe_get(chg, 'dial_per_day', 3))
 
                         st.markdown("<br>", unsafe_allow_html=True)
-                        if st.form_submit_button("💾 Salvar Alterações de Configuração", use_container_width=True, type="primary"):
+                        if st.form_submit_button("💾 Salvar Alterações de Configuração", width="stretch", type="primary"):
                             # Preparar atualização
                             update_doc = {
                                 "instance_name": new_name,
@@ -205,7 +205,7 @@ with tab1:
                     
                     c_col1, c_col2 = st.columns(2)
                     with c_col1:
-                        if st.button("💾 Salvar Alterações JSON", key=f"save_json_{inst['_id']}", use_container_width=True, type="primary"):
+                        if st.button("💾 Salvar Alterações JSON", key=f"save_json_{inst['_id']}", width="stretch", type="primary"):
                             try:
                                 updated_data = json.loads(json_str)
                                 # Manter o ID original
@@ -224,14 +224,14 @@ with tab1:
                             file_name=f"{inst_name}_config.json",
                             mime="application/json",
                             key=f"dl_json_{inst['_id']}",
-                            use_container_width=True
+                            width="stretch"
                         )
 
                 # Zona de Perigo fora das abas mas dentro do expander
                 st.divider()
                 with st.expander("🗑️ Zona de Perigo"):
                     st.write(f"Tem certeza que deseja excluir **{inst_name}**?")
-                    if st.button("🗑️ Excluir Permanentemente", key=f"del_{inst['_id']}", type="primary", use_container_width=True):
+                    if st.button("🗑️ Excluir Permanentemente", key=f"del_{inst['_id']}", type="primary", width="stretch"):
                         instances_col.delete_one({"_id": inst["_id"]})
                         st.success(f"✅ {inst_name} excluído!")
                         st.rerun()
@@ -312,7 +312,7 @@ with tab2:
             dial_day = st.number_input("Discagens por Dia", value=3)
 
         st.markdown("<br>", unsafe_allow_html=True)
-        submitted = st.form_submit_button("➕ Criar Instância", use_container_width=True, type="primary")
+        submitted = st.form_submit_button("➕ Criar Instância", width="stretch", type="primary")
         
         if submitted:
             if not name or not erp_token or not ast_host or not ast_user or not ast_pass or not ast_channel:
@@ -383,7 +383,7 @@ with tab3:
                 data=all_json,
                 file_name="all_instances_backup.json",
                 mime="application/json",
-                use_container_width=True
+                width="stretch"
             )
         else:
             st.info("Nenhuma instância para exportar")
@@ -404,7 +404,7 @@ with tab3:
                 
                 st.info(f"Encontrada(s) {len(instances_data)} instância(s) no arquivo")
                 
-                if st.button("📤 Importar Instâncias", use_container_width=True):
+                if st.button("📤 Importar Instâncias", width="stretch"):
                     imported = 0
                     for inst_data in instances_data:
                         # Remover _id para evitar conflitos

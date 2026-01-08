@@ -248,7 +248,7 @@ with st.container():
         #     <span style='color: #ef4444;'>●</span> Debt Collector
         # </div>
         # """, unsafe_allow_html=True)
-        st_echarts(options=options, height="100px")
+        st_echarts(options=options, height="100px", key="clients_bar")
 
 st.markdown("<br>", unsafe_allow_html=True)
 
@@ -318,7 +318,7 @@ with st.container():
                 }
             ]
         }
-        st_echarts(options=options, height="140px")
+        st_echarts(options=options, height="140px", key="bills_bar")
         
     with b_col3:
         # Blocos coloridos para detalhamento de valor - Empilhados Verticalmente
@@ -377,7 +377,7 @@ with c1:
                 "label": {"show": True, "position": "top"}
             }]
         }
-        st_echarts(options=options, height="400px")
+        st_echarts(options=options, height="400px", key="client_type_bar")
     else:
         st.info("No data available")
 
@@ -418,7 +418,7 @@ with c2:
                 "label": {"show": True, "position": "top"}
             }]
         }
-        st_echarts(options=options, height="400px")
+        st_echarts(options=options, height="400px", key="neighborhood_bar")
     else:
         st.info("No data available")
 
@@ -464,7 +464,7 @@ with c3:
                 "label": {"show": True, "position": "top"}
             }]
         }
-        st_echarts(options=options, height="400px")
+        st_echarts(options=options, height="400px", key="debt_age_bar")
     else:
         st.info("No data available")
 
@@ -587,7 +587,7 @@ with st.container():
                         del s["areaStyle"]
                     s["label"] = {"show": False} # Too crowded for time series usually
                     
-                st_echarts(options=options, height="400px")
+                st_echarts(options=options, height="400px", key="cdr_stacked_bar")
             else:
                 st.info("Nenhum dado histórico de CDR encontrado")
         else:

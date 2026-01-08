@@ -34,7 +34,7 @@ with col_test1:
 with col_test2:
     st.write("")  # Espaçador
     st.write("")  # Espaçador
-    if st.button("🧪 Testar Conexão", use_container_width=True):
+    if st.button("🧪 Testar Conexão", width="stretch"):
         with st.spinner("Testando conexão..."):
             success, message = test_mongo_connection(test_uri, test_db)
             if success:
@@ -58,7 +58,7 @@ with st.form("settings_form"):
     col_save, col_export = st.columns(2)
     
     with col_save:
-        submitted = st.form_submit_button("💾 Salvar Alterações", use_container_width=True)
+        submitted = st.form_submit_button("💾 Salvar Alterações", width="stretch")
     
     if submitted:
         # Validar entradas
@@ -100,7 +100,7 @@ with col_exp:
         data=json_data,
         file_name="collector_config.json",
         mime="application/json",
-        use_container_width=True
+        width="stretch"
     )
 
 with col_imp:
@@ -111,7 +111,7 @@ with col_imp:
         try:
             config = json.load(uploaded_file)
             
-            if st.button("📤 Aplicar Configuração Importada", use_container_width=True):
+            if st.button("📤 Aplicar Configuração Importada", width="stretch"):
                 for key, value in config.items():
                     if key in ["MONGO_URI", "DB_NAME", "DEBUG"]:
                         set_key(dotenv_path, key, str(value))

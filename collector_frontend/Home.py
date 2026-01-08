@@ -70,15 +70,15 @@ with col3:
     
     col_a, col_b = st.columns(2)
     with col_a:
-        if st.button("📋 Instâncias", use_container_width=True):
+        if st.button("📋 Instâncias", width="stretch"):
             st.switch_page("pages/1_Instances.py")
-    
-    with col_b:
-        if st.button("📊 Dashboard", use_container_width=True):
+            
+        if st.button("📊 Dashboard", width="stretch"):
             st.switch_page("pages/2_Dashboard.py")
-    
-    if st.button("⚙️ Configurações", use_container_width=True):
-        st.switch_page("pages/3_Settings.py")
+            
+    with col3:
+        if st.button("⚙️ Configurações", width="stretch"):
+            st.switch_page("pages/4_Settings.py")
 
 # Prévia de Atividade Recente
 st.divider()
