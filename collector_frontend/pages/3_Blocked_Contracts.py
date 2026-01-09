@@ -311,6 +311,62 @@ for status, items in list_by.get("status_internet", {}).items():
             "Status Velocidade": item.get("status_velocidade"),
             "Data Suspensão": item.get("data_inicial_suspensao"),
         })
+        
+        # Calculate 'Dias Suspenso'
+        d_susp = item.get("data_inicial_suspensao")
+        days_diff = 0
+        if d_susp:
+            try:
+                if isinstance(d_susp, str):
+                    # Attempt common formats
+                    # IXC often sends YYYY-MM-DD
+                    d_obj = pd.to_datetime(d_susp).date()
+                elif isinstance(d_susp, datetime):
+                    d_obj = d_susp.date()
+                else:
+                    d_obj = None
+                
+                if d_obj:
+                    days_diff = (datetime.now().date() - d_obj).days
+            except Exception:
+                days_diff = 0
+        
+        flat_rows[-1]["Dias Suspenso"] = days_diff
+
+
+# --- Days Suspended Chart ---
+if flat_rows:
+    st.markdown("##### 📅 Distribuição por Dias de Suspensão")
+    df_chart = pd.DataFrame(flat_rows)
+    # Count frequencies
+    if "Dias Suspenso" in df_chart.columns:
+        counts = df_chart["Dias Suspenso"].value_counts().sort_index()
+        
+        # Prepare data for ECharts
+        # x_data = [str(d) for d in counts.index]
+        # But maybe too many bars?
+        # Let's show all for now as requested.
+        
+        x_data = counts.index.astype(str).tolist()
+        y_data = counts.values.tolist()
+        
+        options_days = {
+            "tooltip": {"trigger": "axis", "axisPointer": {"type": "shadow"}},
+            "grid": {"left": "3%", "right": "4%", "bottom": "10%", "containLabel": True},
+            "xAxis": [{"type": "category", "data": x_data, "name": "Dias"}],
+            "yAxis": [{"type": "value", "name": "Contratos"}],
+            "series": [
+                {
+                    "name": "Contratos",
+                    "type": "bar",
+                    "data": y_data,
+                    "itemStyle": {"color": "#6366f1"}
+                }
+            ]
+        }
+        st_echarts(options=options_days, height="300px", key="days_suspended_chart")
+        st.markdown("<br>", unsafe_allow_html=True)
+
 
 # --- Single Table ---
 st.markdown("##### 📋 Detalhes dos Contratos")
@@ -330,7 +386,8 @@ if flat_rows:
         hide_index=True,
         height=800,
         column_config={
-            "Data Suspensão": st.column_config.DateColumn("Data Suspensão", format="DD/MM/YYYY")
+            "Data Suspensão": st.column_config.DateColumn("Data Suspensão", format="DD/MM/YYYY"),
+            "Dias Suspenso": st.column_config.NumberColumn("Dias Suspenso", format="%d")
         }
     )
     
