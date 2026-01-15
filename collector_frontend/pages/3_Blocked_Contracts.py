@@ -301,19 +301,30 @@ with c_stat1:
     st.markdown("##### 🌐 Tipo Cliente")
     tc_stats = stats.get("tipo_cliente", {})
     if tc_stats:
-        df_tc = pd.DataFrame(list(tc_stats.items()), columns=['Tipo', 'Count']).sort_values('Count', ascending=False).head(10)
+        # Convert to list of dicts for easier processing
+        tc_data_list = []
+        for name, counts in tc_stats.items():
+            total = counts.get("short", 0) + counts.get("long", 0)
+            tc_data_list.append({"Tipo": name, "short": counts.get("short", 0), "long": counts.get("long", 0), "total": total})
+        
+        df_tc = pd.DataFrame(tc_data_list).sort_values("total", ascending=False).head(10)
+        
         options_tc = {
-            "tooltip": {"trigger": "axis"},
-            "grid": {"left": "3%", "right": "4%", "bottom": "15%", "containLabel": True},
+            "tooltip": {"trigger": "axis", "axisPointer": {"type": "shadow"}},
+            "legend": {"top": 0},
+            "grid": {"left": "3%", "right": "4%", "bottom": "25%", "containLabel": True},
             "xAxis": {"type": "category", "data": df_tc['Tipo'].tolist(), "axisLabel": {"interval": 0, "rotate": 35}},
             "yAxis": {"type": "value"},
-            "series": [{
-                "name": "Contratos", 
-                "type": "bar", 
-                "data": df_tc['Count'].tolist(),
-                "label": {"show": True, "position": "top"},
-                "itemStyle": {"color": "#6366f1"}
-            }]
+            "series": [
+                {
+                    "name": "≤ 7 dias", "type": "bar", "stack": "total",
+                    "data": df_tc['short'].tolist(), "itemStyle": {"color": "#10b981"}
+                },
+                {
+                    "name": "> 7 dias", "type": "bar", "stack": "total",
+                    "data": df_tc['long'].tolist(), "itemStyle": {"color": "#ef4444"}
+                }
+            ]
         }
         st_echarts(options=options_tc, height="350px", key="blocked_tipo_chart")
 
@@ -321,19 +332,29 @@ with c_stat2:
     st.markdown("##### 🗺️ Bairro")
     b_stats = stats.get("bairro", {})
     if b_stats:
-        df_b = pd.DataFrame(list(b_stats.items()), columns=['Bairro', 'Count']).sort_values('Count', ascending=False).head(10)
+        b_data_list = []
+        for name, counts in b_stats.items():
+            total = counts.get("short", 0) + counts.get("long", 0)
+            b_data_list.append({"Bairro": name, "short": counts.get("short", 0), "long": counts.get("long", 0), "total": total})
+        
+        df_b = pd.DataFrame(b_data_list).sort_values("total", ascending=False).head(10)
+        
         options_b = {
-            "tooltip": {"trigger": "axis"},
-            "grid": {"left": "3%", "right": "4%", "bottom": "15%", "containLabel": True},
+            "tooltip": {"trigger": "axis", "axisPointer": {"type": "shadow"}},
+            "legend": {"top": 0},
+            "grid": {"left": "3%", "right": "4%", "bottom": "25%", "containLabel": True},
             "xAxis": {"type": "category", "data": df_b['Bairro'].tolist(), "axisLabel": {"interval": 0, "rotate": 35}},
             "yAxis": {"type": "value"},
-            "series": [{
-                "name": "Contratos", 
-                "type": "bar", 
-                "data": df_b['Count'].tolist(),
-                "label": {"show": True, "position": "top"},
-                "itemStyle": {"color": "#6366f1"}
-            }]
+            "series": [
+                {
+                    "name": "≤ 7 dias", "type": "bar", "stack": "total",
+                    "data": df_b['short'].tolist(), "itemStyle": {"color": "#10b981"}
+                },
+                {
+                    "name": "> 7 dias", "type": "bar", "stack": "total",
+                    "data": df_b['long'].tolist(), "itemStyle": {"color": "#ef4444"}
+                }
+            ]
         }
         st_echarts(options=options_b, height="350px", key="blocked_bairro_chart")
 
@@ -342,24 +363,65 @@ with c_stat3:
     age_stats = stats.get("expired_age", {})
     if age_stats:
         # Sort age stats by the numeric value of the key
-        sorted_ages = sorted(age_stats.items(), key=lambda x: int(x[0]) if str(x[0]).isdigit() else 999)
-        age_labels = [f"{k}d" for k, v in sorted_ages]
-        age_values = [v for k, v in sorted_ages]
+        sorted_age_keys = sorted(age_stats.keys(), key=lambda x: int(x) if x.isdigit() else 999)
+        
+        # Get unique statuses for series
+        unique_statuses = set()
+        for s_dict in age_stats.values():
+            unique_statuses.update(s_dict.keys())
+        
+        status_series = []
+        for i, status in enumerate(sorted(unique_statuses)):
+            label = internet_labels.get(status, status)
+            data_points = []
+            for k in sorted_age_keys:
+                dp_val = age_stats[k].get(status, 0)
+                data_points.append(dp_val)
+            
+            # Color coding based on age category for non-stacked simple bars? 
+            # No, user wants vertical stacked. So we stack by status.
+            # But the user also wants "separed colors to contracts with bills.expired_age <= 7 and > 7".
+            # For this age chart, X-axis IS the age. So the color difference can be visual.
+            # We can use visualMap or color specific data items.
+            
+            # For simplicity and clarity, let's keep the stacks by status and use colors from net_colors.
+            status_series.append({
+                "name": label, "type": "bar", "stack": "total",
+                "data": data_points,
+                "itemStyle": {"color": net_colors[i % len(net_colors)]}
+            })
         
         options_age = {
-            "tooltip": {"trigger": "axis"},
+            "tooltip": {"trigger": "axis", "axisPointer": {"type": "shadow"}},
+            "legend": {"top": 0},
             "grid": {"left": "3%", "right": "4%", "bottom": "15%", "containLabel": True},
-            "xAxis": {"type": "category", "data": age_labels},
+            "xAxis": {"type": "category", "data": [f"{k}d" for k in sorted_age_keys]},
             "yAxis": {"type": "value"},
-            "series": [{
-                "name": "Contratos", 
-                "type": "bar", 
-                "data": age_values,
-                "label": {"show": True, "position": "top"},
-                "itemStyle": {"color": "#6366f1"}
-            }]
+            "series": [
+                *status_series,
+                # Use markArea on the first series to highlight groups
+                {
+                    "name": "Background", "type": "bar", "stack": "total", "data": [0] * len(sorted_age_keys),
+                    "markArea": {
+                        "silent": True,
+                        "itemStyle": {"color": "rgba(110, 110, 110, 0.05)"},
+                        "data": [
+                            [{"name": "≤ 7d", "xAxis": "1d" if "1" in sorted_age_keys else sorted_age_keys[0]}, {"xAxis": "7d"}],
+                            [{"name": "> 7d", "xAxis": "8d" if "8" in sorted_age_keys else sorted_age_keys[min(7, len(sorted_age_keys)-1)]}, {"xAxis": sorted_age_keys[-1]}]
+                        ]
+                    }
+                }
+            ],
+            # Add visualMap to highlight short vs long columns background or similar?
+            # Or just let the users see the gap.
+            "graphic": [
+                {
+                    "type": "text", "left": "center", "top": "bottom",
+                    "style": {"text": "≤ 7 dias (Curto Prazo)  |  > 7 dias (Longo Prazo)", "fill": "#64748b", "fontSize": 10}
+                }
+            ]
         }
-        st_echarts(options=options_age, height="300px", key="blocked_age_chart")
+        st_echarts(options=options_age, height="350px", key="blocked_age_chart")
     else:
         st.info("Dados de vencimento não disponíveis.")
 
@@ -418,60 +480,57 @@ for bill in expired_bills:
     flat_rows[-1]["Dias Suspenso"] = days_susp
 
 
-# --- Days Suspended Chart ---
+# --- Table Section ---
+st.markdown("---")
+st.markdown("### 📋 Detalhes das Faturas em Atraso")
+
 if flat_rows:
-    st.markdown("##### 📅 Distribuição por Dias de Suspensão")
-    df_chart = pd.DataFrame(flat_rows)
-    # Count frequencies
-    if "Dias Suspenso" in df_chart.columns:
-        counts = df_chart["Dias Suspenso"].value_counts().sort_index()
-        
-        # Prepare data for ECharts
-        # x_data = [str(d) for d in counts.index]
-        # But maybe too many bars?
-        # Let's show all for now as requested.
-        
-        x_data = counts.index.astype(str).tolist()
-        y_data = counts.values.tolist()
-        
-        options_days = {
-            "tooltip": {"trigger": "axis", "axisPointer": {"type": "shadow"}},
-            "grid": {"left": "3%", "right": "4%", "bottom": "10%", "containLabel": True},
-            "xAxis": [{"type": "category", "data": x_data, "name": "Dias"}],
-            "yAxis": [{"type": "value", "name": "Contratos"}],
-            "series": [
-                {
-                    "name": "Contratos",
-                    "type": "bar",
-                    "data": y_data,
-                    "itemStyle": {"color": "#6366f1"}
+    df_all = pd.DataFrame(flat_rows)
+    # Define important columns
+    important_cols = ["ID Fatura", "Cliente", "Valor", "Vencimento", "Dias Atraso", "Status Bloqueio"]
+    
+    # Split by delay
+    df_short = df_all[df_all["Dias Atraso"] <= 7][important_cols].sort_values("Dias Atraso", ascending=False)
+    df_long = df_all[df_all["Dias Atraso"] > 7][important_cols].sort_values("Dias Atraso", ascending=False)
+
+    col_t1, col_t2 = st.columns(2)
+    
+    with col_t1:
+        st.markdown("##### ⏳ Curto Prazo (≤ 7 dias)")
+        if not df_short.empty:
+            df_short["ID Fatura"] = df_short["ID Fatura"].astype(str)
+            st.dataframe(
+                df_short,
+                width="stretch",
+                hide_index=True,
+                height=400,
+                column_config={
+                    "Vencimento": st.column_config.DateColumn("Vencimento", format="DD/MM/YYYY"),
+                    "Valor": st.column_config.NumberColumn("Valor", format="R$ %.2f"),
+                    "Dias Atraso": st.column_config.NumberColumn("Atraso", format="%d")
                 }
-            ]
-        }
-        st_echarts(options=options_days, height="300px", key="days_suspended_chart")
-        st.markdown("<br>", unsafe_allow_html=True)
+            )
+        else:
+            st.info("Nenhuma fatura nesta categoria.")
 
+    with col_t2:
+        st.markdown("##### 📅 Longo Prazo (> 7 dias)")
+        if not df_long.empty:
+            df_long["ID Fatura"] = df_long["ID Fatura"].astype(str)
+            st.dataframe(
+                df_long,
+                width="stretch",
+                hide_index=True,
+                height=400,
+                column_config={
+                    "Vencimento": st.column_config.DateColumn("Vencimento", format="DD/MM/YYYY"),
+                    "Valor": st.column_config.NumberColumn("Valor", format="R$ %.2f"),
+                    "Dias Atraso": st.column_config.NumberColumn("Atraso", format="%d")
+                }
+            )
+        else:
+            st.info("Nenhuma fatura nesta categoria.")
 
-# --- Single Table ---
-st.markdown("##### 📋 Detalhes dos Contratos (Faturas em Atraso)")
-if flat_rows:
-    df_table = pd.DataFrame(flat_rows)
-    
-    df_table["ID Fatura"] = df_table["ID Fatura"].astype(str)
-    df_table["ID Contrato"] = df_table["ID Contrato"].astype(str)
-    
-    st.dataframe(
-        df_table, 
-        width="stretch", 
-        hide_index=True,
-        height=800,
-        column_config={
-            "Vencimento": st.column_config.DateColumn("Vencimento", format="DD/MM/YYYY"),
-            "Valor": st.column_config.NumberColumn("Valor", format="R$ %.2f"),
-            "Dias Atraso": st.column_config.NumberColumn("Dias Atraso", format="%d")
-        }
-    )
-    
     st.markdown("""
     <style>
     div[data-testid="stDataFrame"] > div {
@@ -479,7 +538,6 @@ if flat_rows:
     }
     </style>
     """, unsafe_allow_html=True)
-
 else:
     st.info("Nenhum contrato bloqueado encontrado.")
 

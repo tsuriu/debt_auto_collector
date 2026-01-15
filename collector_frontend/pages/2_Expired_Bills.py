@@ -11,7 +11,7 @@ from utils_css import apply_light_theme
 from loguru import logger
 from config import Config
 
-st.set_page_config(page_title="Dashboard de Cobrança", layout="wide")
+st.set_page_config(page_title="Faturas Vencidas", layout="wide")
 
 # Apply shared light theme
 apply_light_theme()

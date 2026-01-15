@@ -273,12 +273,18 @@ class MetricsService:
             bairro_stats = {}
             for contract in all_blocked:
                 raw_name = contract.get("bairro")
+                age = contract.get("expired_age") or 0
+                delay_cat = "short" if age <= 7 else "long"
+                
                 if not raw_name:
                     final_name = "Indefinido"
                 else:
                     norm_name = str(raw_name).lower().strip()
                     final_name = lookup_map.get(norm_name, str(raw_name).strip().title())
-                bairro_stats[final_name] = bairro_stats.get(final_name, 0) + 1
+                
+                if final_name not in bairro_stats:
+                    bairro_stats[final_name] = {"short": 0, "long": 0}
+                bairro_stats[final_name][delay_cat] += 1
             blocked_metrics["stats"]["bairro"] = bairro_stats
 
             # 5.2 Client Type Normalization
@@ -293,12 +299,18 @@ class MetricsService:
             tipo_stats = {}
             for contract in all_blocked:
                 raw_name = contract.get("tipo_cliente")
+                age = contract.get("expired_age") or 0
+                delay_cat = "short" if age <= 7 else "long"
+                
                 if not raw_name:
                     final_name = "Indefinido"
                 else:
                     norm_name = str(raw_name).lower().strip()
                     final_name = type_lookup.get(norm_name, str(raw_name).strip().title())
-                tipo_stats[final_name] = tipo_stats.get(final_name, 0) + 1
+                
+                if final_name not in tipo_stats:
+                    tipo_stats[final_name] = {"short": 0, "long": 0}
+                tipo_stats[final_name][delay_cat] += 1
             blocked_metrics["stats"]["tipo_cliente"] = tipo_stats
 
             # 5.3 Bill Expiry Date (Month/Year)
@@ -316,15 +328,18 @@ class MetricsService:
                         vencimento_stats[month_year] = vencimento_stats.get(month_year, 0) + 1
             blocked_metrics["stats"]["vencimento_mes"] = vencimento_stats
 
-            # 5.4 Expired Age (Days)
+            # 5.4 Expired Age (Days) -> Stacked by Status Internet
             age_stats = {}
             for contract in all_blocked:
                 age = contract.get("expired_age")
+                status = contract.get("status_internet") or "N/A"
                 if age is not None:
                     try:
                         age_val = int(age)
                         age_key = str(age_val)
-                        age_stats[age_key] = age_stats.get(age_key, 0) + 1
+                        if age_key not in age_stats:
+                            age_stats[age_key] = {}
+                        age_stats[age_key][status] = age_stats[age_key].get(status, 0) + 1
                     except:
                         pass
             blocked_metrics["stats"]["expired_age"] = age_stats
