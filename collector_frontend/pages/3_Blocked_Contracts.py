@@ -101,8 +101,19 @@ def get_historical_metrics(fid, limit=48):    # Fetch last 24-48h roughly
         limit=limit
     ))
 
+def get_all_blocked_contracts(fid):
+    # Returns a map of contract_id -> contract_doc for easy lookup
+    cursor = db.blocked_contracts.find({"instance_full_id": fid}, {"_id": 0})
+    return {c.get("id"): c for c in cursor}
+
+def get_expired_bills(fid):
+    return list(db.bills.find({"instance_full_id": fid, "vencimento_status": "expired"}, {"_id": 0}))
+
 metrics_doc = get_latest_metrics(full_id)
 hist_docs = get_historical_metrics(full_id)
+blocked_map = get_all_blocked_contracts(full_id)
+expired_bills = get_expired_bills(full_id)
+
 blocked_data = {}
 timestamp = None
 
@@ -153,30 +164,39 @@ for doc in reversed(hist_docs):
     ts = doc.get("timestamp")
     if not ts: continue
     
-    b_data = doc.get("data", {}).get("blocked_contracts", {}).get("list_by", {})
+    b_data = doc.get("data", {}).get("blocked_contracts", {})
     
     # Aggregates for this timestamp
     row = {"timestamp": ts.strftime("%H:%M")}
     
+    # Try new format 'counts' first, then fallback to old format 'list_by'
+    counts_data = b_data.get("counts", {})
+    list_by_data = b_data.get("list_by", {})
+    
     # Internet
-    i_groups = b_data.get("status_internet", {})
-    for k, v in i_groups.items():
+    i_counts = counts_data.get("status_internet")
+    if i_counts is None: # Fallback to old format
+        i_groups = list_by_data.get("status_internet", {})
+        i_counts = {k: len(v) for k, v in i_groups.items()}
+    
+    for k, val in i_counts.items():
         if k == "A": continue # Ignore Ativo
         label = internet_labels.get(k, k)
-        row[f"internet_{label}"] = len(v)
+        row[f"internet_{label}"] = val
         
     # Speed
-    s_groups = b_data.get("status_velocidade", {})
-    for k, v in s_groups.items():
+    s_counts = counts_data.get("status_velocidade")
+    if s_counts is None: # Fallback to old format
+        s_groups = list_by_data.get("status_velocidade", {})
+        s_counts = {k: len(v) for k, v in s_groups.items()}
+        
+    for k, val in s_counts.items():
         label = speed_labels.get(k, k)
-        row[f"speed_{label}"] = len(v)
+        row[f"speed_{label}"] = val
         
     history_records.append(row)
 
 df_hist = pd.DataFrame(history_records).fillna(0)
-
-# --- Top Charts ---
-c_chart1, c_chart2 = st.columns(2)
 
 # Colors
 speed_colors = ["#3b82f6", "#8b5cf6", "#10b981", "#f59e0b", "#64748b"]
@@ -184,27 +204,38 @@ net_colors = ["#ef4444", "#f97316", "#22c55e", "#06b6d4", "#6366f1"]
 
 from streamlit_echarts import st_echarts
 
-with c_chart1:
+# --- Evolution Data Processing ---
+speed_cols = [c for c in df_hist.columns if c.startswith("speed_")]
+net_cols = [c for c in df_hist.columns if c.startswith("internet_")]
+
+counters_speed = {}
+series_speed = []
+for idx, col in enumerate(speed_cols):
+    name = col.replace("speed_", "")
+    val = df_hist[col].iloc[-1] if not df_hist.empty else 0
+    counters_speed[name] = {"val": int(val), "color": speed_colors[idx % len(speed_colors)]}
+    series_speed.append({
+        "name": name, "type": "line", "stack": "Total", "areaStyle": {},
+        "emphasis": {"focus": "series"}, "data": df_hist[col].tolist()
+    })
+
+counters_net = {}
+series_net = []
+for idx, col in enumerate(net_cols):
+    name = col.replace("internet_", "")
+    val = df_hist[col].iloc[-1] if not df_hist.empty else 0
+    counters_net[name] = {"val": int(val), "color": net_colors[idx % len(net_colors)]}
+    series_net.append({
+        "name": name, "type": "bar", "stack": "Total",
+        "emphasis": {"focus": "series"}, "data": df_hist[col].tolist()
+    })
+
+# --- Evolution and Counters Row ---
+col1, col2, col3, col4 = st.columns([3, 3, 1.2, 1.8])
+
+with col1:
     st.markdown("##### 🚀 Status Velocidade (Evolução)")
     if not df_hist.empty:
-        # Extract Speed columns
-        speed_cols = [c for c in df_hist.columns if c.startswith("speed_")]
-        series_speed = []
-        counters_speed = {}
-        for idx, col in enumerate(speed_cols):
-            name = col.replace("speed_", "")
-            val = df_hist[col].iloc[-1] if not df_hist.empty else 0
-            counters_speed[name] = {"val": int(val), "color": speed_colors[idx % len(speed_colors)]}
-            
-            series_speed.append({
-                "name": name,
-                "type": "line",
-                "stack": "Total",
-                "areaStyle": {},
-                "emphasis": {"focus": "series"},
-                "data": df_hist[col].tolist()
-            })
-            
         options_speed = {
             "tooltip": {"trigger": "axis", "axisPointer": {"type": "cross"}},
             "legend": {"top": 0},
@@ -214,46 +245,15 @@ with c_chart1:
             "series": series_speed,
             "color": speed_colors
         }
-        st_echarts(options=options_speed, height="300px", key="blocked_speed_chart")
-        
-        # Counters Container
-        st.markdown("<div style='display: flex; gap: 10px; flex-wrap: wrap; margin-top: 10px;'>", unsafe_allow_html=True)
-        cols_c = st.columns(len(counters_speed))
-        for i, (name, data) in enumerate(counters_speed.items()):
-            with cols_c[i]:
-                st.markdown(f"""
-                <div style='background-color: {data['color']}20; border: 1px solid {data['color']}; border-radius: 8px; padding: 10px; text-align: center; height: 90px; display: flex; flex-direction: column; justify-content: center;'>
-                     <div style='font-size: 0.75rem; color: {data['color']}; font-weight: 600; line-height: 1.1;'>{name}</div>
-                     <div style='font-size: 1.2rem; color: {data['color']}; font-weight: 800;'>{data['val']}</div>
-                </div>
-                """, unsafe_allow_html=True)
-        st.markdown("</div>", unsafe_allow_html=True)
-        
+        st_echarts(options=options_speed, height="350px", key="blocked_speed_chart")
     else:
         st.info("Sem dados históricos.")
 
-with c_chart2:
+with col2:
     st.markdown("##### 🌐 Status Internet (Evolução)")
     if not df_hist.empty:
-        # Extract Internet columns
-        net_cols = [c for c in df_hist.columns if c.startswith("internet_")]
-        series_net = []
-        counters_net = {}
-        for idx, col in enumerate(net_cols):
-            name = col.replace("internet_", "")
-            val = df_hist[col].iloc[-1] if not df_hist.empty else 0
-            counters_net[name] = {"val": int(val), "color": net_colors[idx % len(net_colors)]}
-            
-            series_net.append({
-                "name": name,
-                "type": "bar",
-                "stack": "Total",
-                "emphasis": {"focus": "series"},
-                "data": df_hist[col].tolist()
-            })
-            
         options_net = {
-             "tooltip": {"trigger": "axis", "axisPointer": {"type": "shadow"}},
+            "tooltip": {"trigger": "axis", "axisPointer": {"type": "shadow"}},
             "legend": {"top": 0},
             "grid": {"left": "3%", "right": "4%", "bottom": "15%", "containLabel": True},
             "xAxis": [{"type": "category", "data": df_hist["timestamp"].tolist()}],
@@ -261,29 +261,111 @@ with c_chart2:
             "series": series_net,
             "color": net_colors
         }
-        st_echarts(options=options_net, height="300px", key="blocked_net_chart")
-        
-        # Counters Container
-        st.markdown("<div style='display: flex; gap: 10px; flex-wrap: wrap; margin-top: 10px;'>", unsafe_allow_html=True)
-        cols_c2 = st.columns(len(counters_net))
-        for i, (name, data) in enumerate(counters_net.items()):
-            with cols_c2[i]:
-                st.markdown(f"""
-                <div style='background-color: {data['color']}20; border: 1px solid {data['color']}; border-radius: 8px; padding: 10px; text-align: center; height: 90px; display: flex; flex-direction: column; justify-content: center;'>
-                     <div style='font-size: 0.75rem; color: {data['color']}; font-weight: 600; line-height: 1.1;'>{name}</div>
-                     <div style='font-size: 1.2rem; color: {data['color']}; font-weight: 800;'>{data['val']}</div>
-                </div>
-                """, unsafe_allow_html=True)
-        st.markdown("</div>", unsafe_allow_html=True)
-        
+        st_echarts(options=options_net, height="350px", key="blocked_net_chart")
     else:
         st.info("Sem dados históricos.")
 
+with col3:
+    st.markdown("<div style='height: 45px;'></div>", unsafe_allow_html=True) # Spacer to align with chart titles
+    if counters_speed:
+        st.markdown("<div style='height: 60px; display: flex; flex-direction: column; justify-content: center; gap: 20px;'>", unsafe_allow_html=True)
+        for name, data in counters_speed.items():
+            st.markdown(f"""
+            <div style='background-color: {data['color']}20; border: 1px solid {data['color']}; border-radius: 8px; padding: 10px; text-align: center; height: 110px; display: flex; flex-direction: column; justify-content: center;'>
+                 <div style='font-size: 0.85rem; color: {data['color']}; font-weight: 600; line-height: 1.1;'>{name}</div>
+                 <div style='font-size: 1.6rem; color: {data['color']}; font-weight: 800;'>{data['val']}</div>
+            </div>
+            """, unsafe_allow_html=True)
+        st.markdown("</div>", unsafe_allow_html=True)
+
+with col4:
+    st.markdown("<div style='height: 45px;'></div>", unsafe_allow_html=True) # Spacer to align with chart titles
+    if counters_net:
+        st.markdown("<div style='height: 20px; display: flex; flex-direction: column; justify-content: center; gap: 10px;'>", unsafe_allow_html=True)
+        for name, data in counters_net.items():
+            st.markdown(f"""
+            <div style='background-color: {data['color']}20; border: 1px solid {data['color']}; border-radius: 8px; padding: 8px; text-align: center; height: 75px; display: flex; flex-direction: column; justify-content: center;'>
+                 <div style='font-size: 0.75rem; color: {data['color']}; font-weight: 600; line-height: 1.1;'>{name}</div>
+                 <div style='font-size: 1.2rem; color: {data['color']}; font-weight: 800;'>{data['val']}</div>
+            </div>
+            """, unsafe_allow_html=True)
+        st.markdown("</div>", unsafe_allow_html=True)
+
+# --- New Stats Charts ---
+st.markdown("<br>", unsafe_allow_html=True)
+c_stat1, c_stat2, c_stat3 = st.columns(3)
+
+stats = blocked_data.get("stats", {})
+
+with c_stat1:
+    st.markdown("##### 🌐 Tipo Cliente")
+    tc_stats = stats.get("tipo_cliente", {})
+    if tc_stats:
+        df_tc = pd.DataFrame(list(tc_stats.items()), columns=['Tipo', 'Count']).sort_values('Count', ascending=False).head(10)
+        options_tc = {
+            "tooltip": {"trigger": "axis"},
+            "grid": {"left": "3%", "right": "4%", "bottom": "15%", "containLabel": True},
+            "xAxis": {"type": "category", "data": df_tc['Tipo'].tolist(), "axisLabel": {"interval": 0, "rotate": 35}},
+            "yAxis": {"type": "value"},
+            "series": [{
+                "name": "Contratos", 
+                "type": "bar", 
+                "data": df_tc['Count'].tolist(),
+                "label": {"show": True, "position": "top"},
+                "itemStyle": {"color": "#6366f1"}
+            }]
+        }
+        st_echarts(options=options_tc, height="350px", key="blocked_tipo_chart")
+
+with c_stat2:
+    st.markdown("##### 🗺️ Bairro")
+    b_stats = stats.get("bairro", {})
+    if b_stats:
+        df_b = pd.DataFrame(list(b_stats.items()), columns=['Bairro', 'Count']).sort_values('Count', ascending=False).head(10)
+        options_b = {
+            "tooltip": {"trigger": "axis"},
+            "grid": {"left": "3%", "right": "4%", "bottom": "15%", "containLabel": True},
+            "xAxis": {"type": "category", "data": df_b['Bairro'].tolist(), "axisLabel": {"interval": 0, "rotate": 35}},
+            "yAxis": {"type": "value"},
+            "series": [{
+                "name": "Contratos", 
+                "type": "bar", 
+                "data": df_b['Count'].tolist(),
+                "label": {"show": True, "position": "top"},
+                "itemStyle": {"color": "#6366f1"}
+            }]
+        }
+        st_echarts(options=options_b, height="350px", key="blocked_bairro_chart")
+
+with c_stat3:
+    st.markdown("##### ⏳ Dívida por Atraso (Dias)")
+    age_stats = stats.get("expired_age", {})
+    if age_stats:
+        # Sort age stats by the numeric value of the key
+        sorted_ages = sorted(age_stats.items(), key=lambda x: int(x[0]) if str(x[0]).isdigit() else 999)
+        age_labels = [f"{k}d" for k, v in sorted_ages]
+        age_values = [v for k, v in sorted_ages]
+        
+        options_age = {
+            "tooltip": {"trigger": "axis"},
+            "grid": {"left": "3%", "right": "4%", "bottom": "15%", "containLabel": True},
+            "xAxis": {"type": "category", "data": age_labels},
+            "yAxis": {"type": "value"},
+            "series": [{
+                "name": "Contratos", 
+                "type": "bar", 
+                "data": age_values,
+                "label": {"show": True, "position": "top"},
+                "itemStyle": {"color": "#6366f1"}
+            }]
+        }
+        st_echarts(options=options_age, height="300px", key="blocked_age_chart")
+    else:
+        st.info("Dados de vencimento não disponíveis.")
 
 st.markdown("<br>", unsafe_allow_html=True)
 
 # --- Analysis Logic for Table ---
-list_by = blocked_data.get("list_by", {})
 # We need to flattening unique contracts. 
 # A contract might appear in multiple lists? 
 # Usually 'list_by' assumes partition, but if we have multiple grouping dimensions, we just pick ONE dimension to iterate and flatten,
@@ -292,34 +374,36 @@ list_by = blocked_data.get("list_by", {})
 # Status Internet group should contain all valid contracts (or N/A). So iterating that group is sufficient.
 
 flat_rows = []
-seen_ids = set()
+for bill in expired_bills:
+    cid = bill.get("id_contrato")
+    contract = blocked_map.get(cid)
+    
+    # Format status
+    if contract:
+        i_status = internet_labels.get(contract.get("status_internet"), contract.get("status_internet"))
+        s_status = speed_labels.get(contract.get("status_velocidade"), contract.get("status_velocidade"))
+        status_bloqueio = f"🌐 {i_status} | 🚀 {s_status}"
+    else:
+        status_bloqueio = "✅ Ativo / Não Bloqueado"
 
-# Iterate over status_internet groups (primary partition)
-# AND status_velocidade groups just in case some are missing?
-# Actually, the service fetches ALL and groups them. So every contract is in exactly one internet_status group.
-for status, items in list_by.get("status_internet", {}).items():
-    for item in items:
-        cid = item.get("id")
-        if cid in seen_ids: continue
-        seen_ids.add(cid)
-        
-        flat_rows.append({
-            "ID Contrato": item.get("id"),
-            "ID Cliente": item.get("id_cliente"),
-            "Cliente": item.get("razao") or "Desconhecido",
-            "Status Internet": item.get("status_internet"),
-            "Status Velocidade": item.get("status_velocidade"),
-            "Data Suspensão": item.get("data_inicial_suspensao"),
-        })
-        
-        # Calculate 'Dias Suspenso'
-        d_susp = item.get("data_inicial_suspensao")
-        days_diff = 0
+    flat_rows.append({
+        "ID Fatura": bill.get("id"),
+        "ID Contrato": cid,
+        "Cliente": bill.get("razao") or "Desconhecido",
+        "Bairro": bill.get("bairro"),
+        "Tipo Cliente": bill.get("tipo_cliente"),
+        "Valor": bill.get("valor_aberto"),
+        "Vencimento": bill.get("data_vencimento"),
+        "Dias Atraso": bill.get("expired_age"),
+        "Status Bloqueio": status_bloqueio
+    })
+    # Calculate 'Dias Suspenso' (from contract data if available)
+    days_susp = 0
+    if contract:
+        d_susp = contract.get("data_inicial_suspensao")
         if d_susp:
             try:
                 if isinstance(d_susp, str):
-                    # Attempt common formats
-                    # IXC often sends YYYY-MM-DD
                     d_obj = pd.to_datetime(d_susp).date()
                 elif isinstance(d_susp, datetime):
                     d_obj = d_susp.date()
@@ -327,11 +411,11 @@ for status, items in list_by.get("status_internet", {}).items():
                     d_obj = None
                 
                 if d_obj:
-                    days_diff = (datetime.now().date() - d_obj).days
+                    days_susp = (datetime.now().date() - d_obj).days
             except Exception:
-                days_diff = 0
-        
-        flat_rows[-1]["Dias Suspenso"] = days_diff
+                days_susp = 0
+    
+    flat_rows[-1]["Dias Suspenso"] = days_susp
 
 
 # --- Days Suspended Chart ---
@@ -369,33 +453,29 @@ if flat_rows:
 
 
 # --- Single Table ---
-st.markdown("##### 📋 Detalhes dos Contratos")
+st.markdown("##### 📋 Detalhes dos Contratos (Faturas em Atraso)")
 if flat_rows:
     df_table = pd.DataFrame(flat_rows)
     
-    # Styling for white background is default in Streamlit Light Mode, but we can force some CSS wrapper if needed.
-    # The user asked "Use white background". 
-    # Let's ensure columns are strings/ints as appropriate
+    df_table["ID Fatura"] = df_table["ID Fatura"].astype(str)
     df_table["ID Contrato"] = df_table["ID Contrato"].astype(str)
-    df_table["ID Cliente"] = df_table["ID Cliente"].astype(str)
     
-    # Increase height to show more lines (e.g. 500-600px instead of default)
     st.dataframe(
         df_table, 
         width="stretch", 
         hide_index=True,
         height=800,
         column_config={
-            "Data Suspensão": st.column_config.DateColumn("Data Suspensão", format="DD/MM/YYYY"),
-            "Dias Suspenso": st.column_config.NumberColumn("Dias Suspenso", format="%d")
+            "Vencimento": st.column_config.DateColumn("Vencimento", format="DD/MM/YYYY"),
+            "Valor": st.column_config.NumberColumn("Valor", format="R$ %.2f"),
+            "Dias Atraso": st.column_config.NumberColumn("Dias Atraso", format="%d")
         }
     )
     
-    # Add CSS to force dataframe background to white just in case
     st.markdown("""
     <style>
     div[data-testid="stDataFrame"] > div {
-        background-color: white !important; /* Force white background on dataframe container */
+        background-color: white !important;
     }
     </style>
     """, unsafe_allow_html=True)

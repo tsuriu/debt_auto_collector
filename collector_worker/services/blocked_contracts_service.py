@@ -35,6 +35,18 @@ class BlockedContractsService:
             instance_clients = list(self.db.clients.find({"instance_full_id": self.instance_full_id}))
             client_map = {str(c['id']): c for c in instance_clients} # Map by string ID for safety
 
+            # 3. Fetch expired bills for this instance to relate with blocked contracts
+            expired_bills = list(self.db.bills.find({
+                "instance_full_id": self.instance_full_id,
+                "vencimento_status": "expired"
+            }).sort("data_vencimento", 1)) # Sort by date ascending to get oldest first
+            
+            contract_bill_map = {}
+            for bill in expired_bills:
+                c_id = bill.get('id_contrato')
+                if c_id and c_id not in contract_bill_map:
+                    contract_bill_map[c_id] = bill
+            
             processed_contracts = []
             
             for contract in raw_contracts:
@@ -54,7 +66,10 @@ class BlockedContractsService:
                         # Request says "Inject the same metadata keys used in the bills service".
                         # If client not found, we can't inject much.
                         continue
-                        
+
+                    # Hydration from Oldest Expired Bill
+                    oldest_bill = contract_bill_map.get(contract_id)
+                    
                     processed_item = {
                         "instance_full_id": self.instance_full_id,
                         "instance_name": self.instance_name,
@@ -68,8 +83,7 @@ class BlockedContractsService:
                         "num_parcelas_atraso": contract.get('num_parcelas_atraso'),
                         "data_inicial_suspensao": contract.get('data_inicial_suspensao'),
 
-                        
-                        # Hydrated Data
+                        # Hydrated Data from Client
                         "razao": client_data.get('razao'),
                         "fantasia": client_data.get('fantasia'),
                         "cidade": client_data.get('cidade'),
@@ -77,6 +91,13 @@ class BlockedContractsService:
                         "endereco": client_data.get('endereco'),
                         "telefone_celular": client_data.get('telefone_celular'),
                         "whatsapp": client_data.get('whatsapp'),
+                        
+                        # Hydrated Data from Bill
+                        "data_vencimento": oldest_bill.get('data_vencimento') if oldest_bill else None,
+                        "dias_vencimento": oldest_bill.get('dias_vencimento') if oldest_bill else None,
+                        "expired_age": oldest_bill.get('expired_age') if oldest_bill else None,
+                        "id_tipo_cliente": oldest_bill.get('id_tipo_cliente') if oldest_bill else client_data.get('id_tipo_cliente'),
+                        "tipo_cliente": oldest_bill.get('tipo_cliente') if oldest_bill else client_data.get('tipo_cliente'),
                         
                         "last_updated": datetime.now()
                     }

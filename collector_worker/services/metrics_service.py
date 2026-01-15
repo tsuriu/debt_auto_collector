@@ -241,25 +241,93 @@ class MetricsService:
 
             # 5. Blocked Contracts Metrics
             blocked_metrics = {
-                "list_by": {}
+                "counts": {},
+                "stats": {}
             }
-            
-            # Helper to build grouped structure
-            # We need to process "status_internet" and "status_velocidade"
-            target_fields = ["status_internet", "status_velocidade", "contrato"]
             
             # Fetch all once
             all_blocked = list(self.db.blocked_contracts.find({"instance_full_id": self.instance_full_id}, {"_id": 0}))
             
-            # Group in Python to fill list_by
-            for field in target_fields:
-                grouped = {}
+            # Fields for 'counts' (used for historical tracking)
+            target_count_fields = ["status_internet", "status_velocidade", "contrato"]
+            for field in target_count_fields:
+                field_counts = {}
                 for contract in all_blocked:
                     val = contract.get(field) or "N/A"
-                    if val not in grouped:
-                        grouped[val] = []
-                    grouped[val].append(contract)
-                blocked_metrics["list_by"][field] = grouped
+                    field_counts[val] = field_counts.get(val, 0) + 1
+                blocked_metrics["counts"][field] = field_counts
+
+            # Fields for 'stats' (counts for dashboard charts)
+            # 5.1 Bairro Normalization
+            default_map = self.DEFAULT_REVERSE_MAP.get('neighborhood', {})
+            instance_map = self.instance.get('erp', {}).get('reverse_map', {}).get('neighborhood', {})
+            lookup_map = {}
+            def populate_lookup(source_map):
+                for correct, variants in source_map.items():
+                    if isinstance(variants, list):
+                        for v in variants:
+                            if v: lookup_map[v.lower().strip()] = correct
+            populate_lookup(default_map)
+            populate_lookup(instance_map)
+
+            bairro_stats = {}
+            for contract in all_blocked:
+                raw_name = contract.get("bairro")
+                if not raw_name:
+                    final_name = "Indefinido"
+                else:
+                    norm_name = str(raw_name).lower().strip()
+                    final_name = lookup_map.get(norm_name, str(raw_name).strip().title())
+                bairro_stats[final_name] = bairro_stats.get(final_name, 0) + 1
+            blocked_metrics["stats"]["bairro"] = bairro_stats
+
+            # 5.2 Client Type Normalization
+            client_types_cursor = self.db.client_types.find({"instance_full_id": self.instance_full_id})
+            type_lookup = {}
+            for ct in client_types_cursor:
+                ct_id = ct.get('id')
+                ct_name = ct.get('tipo_cliente')
+                if ct_id is not None: type_lookup[str(ct_id)] = ct_name
+                if ct_name: type_lookup[ct_name.lower().strip()] = ct_name
+
+            tipo_stats = {}
+            for contract in all_blocked:
+                raw_name = contract.get("tipo_cliente")
+                if not raw_name:
+                    final_name = "Indefinido"
+                else:
+                    norm_name = str(raw_name).lower().strip()
+                    final_name = type_lookup.get(norm_name, str(raw_name).strip().title())
+                tipo_stats[final_name] = tipo_stats.get(final_name, 0) + 1
+            blocked_metrics["stats"]["tipo_cliente"] = tipo_stats
+
+            # 5.3 Bill Expiry Date (Month/Year)
+            vencimento_stats = {}
+            for contract in all_blocked:
+                dt = contract.get("data_vencimento")
+                if dt:
+                    if isinstance(dt, str):
+                        try:
+                            dt = datetime.fromisoformat(dt)
+                        except:
+                            dt = None
+                    if dt:
+                        month_year = dt.strftime("%m/%Y")
+                        vencimento_stats[month_year] = vencimento_stats.get(month_year, 0) + 1
+            blocked_metrics["stats"]["vencimento_mes"] = vencimento_stats
+
+            # 5.4 Expired Age (Days)
+            age_stats = {}
+            for contract in all_blocked:
+                age = contract.get("expired_age")
+                if age is not None:
+                    try:
+                        age_val = int(age)
+                        age_key = str(age_val)
+                        age_stats[age_key] = age_stats.get(age_key, 0) + 1
+                    except:
+                        pass
+            blocked_metrics["stats"]["expired_age"] = age_stats
 
             # 6. Construct Metric Document
             metric_doc = {
