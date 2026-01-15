@@ -48,6 +48,10 @@ Monitoring and analysis of customers with suspended services:
     - **Dívida por Atraso**: Stacked bar chart showing the breakdown of debt age, highlighting operational groups.
 - **Evolution Tracking**: Historical Stacked Area and Bar charts for connectivity and speed tier trends.
 - **Detailed Inventory**: Bill-centric tables separated into **Curto Prazo (≤ 7 dias)** and **Longo Prazo (> 7 dias)**, displaying essential columns like `ID Fatura`, `Cliente`, `Valor`, `Vencimento`, and `Status Bloqueio`.
+    - **Status Bloqueio Interpretation**:
+        - **🌐 (Internet)**: Connectivity state from IXC (e.g., *Bloqueio Automático*, *Financeiro em Atraso*).
+        - **🚀 (Velocidade)**: Speed tier state (*Normal* or *Reduzida*).
+        - **✅ Ativo / Não Bloqueado**: Bill is expired but no technical restriction has been applied to the contract yet.
 - **Auto-Refresh**: Synchronized with the 60-second system-wide refresh for real-time monitoring.
 
 ### 3. Instance Management (`1_Instances.py`)
