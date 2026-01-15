@@ -399,7 +399,7 @@ with c_stat3:
                 }
             ]
         }
-        st_echarts(options=options_age, height="350px", key="blocked_age_chart")
+        st_echarts(options=options_age, height="360px", key="blocked_age_chart")
     else:
         st.info("Dados de vencimento não disponíveis.")
 
