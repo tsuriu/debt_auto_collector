@@ -40,15 +40,17 @@ The fastest way to run the entire stack is via Docker Compose:
 ### Interactive Dashboard (`collector_frontend`)
 - **Real-time Monitoring**: Comprehensive KPIs for active clients, debt volume, and daily collection status.
 - **Automated Refresh**: Hardcoded 60-second auto-refresh across all dashboard views for consistent real-time monitoring.
-- **Daily Focus**: All historical charts and trends are automatically filtered to show metrics for the **current day**.
-- **Blocked Contracts**: Dedicated dashboard for monitoring suspended services with historical status tracking and detailed contract tables.
+- **Expired Bills Focus**: Specialized view for tracking and analyzing delinquent invoices with aging breakdowns and payment trends.
+- **Blocked Contracts Dashboard**: Dedicated monitoring for suspended services featuring:
+    - **Evolution Tracking**: Historical charts for internet and speed status trends.
+    - **Bairro & Tipo Cliente Analysis**: Vertical stacked charts grouped by short/long delay cohorts.
+    - **Operational Grouping**: Detailed bill-centric tables separated into **Curto Prazo (≤ 7 dias)** and **Longo Prazo (> 7 dias)** to prioritize collection.
 - **Advanced Visualizations**:
-    - **CDR Overview**: Redesigned disposition grid with color-coded horizontal stats and daily trend charts.
-    - **Categorized Charts**: Vertical Bar and Area graphs for demographic, debt aging, and contract status analysis.
+    - **CDR Overview**: Outcome counts in color-coded horizontal boxes and high-fidelity daily trend area charts.
+    - **Color-Coded Cohorts**: Use of distinct colors (**Orange** for ≤ 7 days, **Red** for > 7 days) across all distribution charts.
 - **Robust Configuration**:
-    - A categorized form-based editor for instance management.
-    - Dropdown support for multiple ERP types (**ixc**, **rbx**, **altarede**).
-    - Integrated **Form/JSON Toggle** for technical configuration flexibility.
+    - Categorized form-based management for multiple ERP types (**ixc**, **rbx**, **altarede**).
+    - Integrated **Form/JSON Toggle** for advanced technical configurations.
 
 ## 🛠️ Development
 

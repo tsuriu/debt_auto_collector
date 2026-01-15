@@ -114,21 +114,23 @@ The Service runs on a schedule defined in `main.py`.
 3.  **Upsert**: Updates the `blocked_contracts` collection in MongoDB.
 4.  **Log**: Records execution stats to `history_action_log`.
 
-6. **Metrics Collection (`run_metrics_job`)**
+### 5. Metrics Collection (`run_metrics_job`)
 **Schedule**: Every 30 minutes
-1.  **Aggregate Clients**: 
-    *   Total clients.
-    *   Clients with open debt.
-    *   **Classification**: Counts for `pre_force_debt_collection` and `force_debt_collection`.
-2.  **Aggregate Bills**: 
-    *   Total and Expired counts.
-    *   **Classification**: Counts and Total Value for `pre_force_debt_collection` and `force_debt_collection`.
-    *   **Bill Stats**: Aggregates counts individually by key. `bairro` and `tipo_cliente` are returned as dictionaries `{Name: Count}` after normalization. Other keys return a list of objects.
-    *   **Normalization**: Uses `instance.erp.reverse_map.neighborhood` and `instance.erp.reverse_map.tipo_cliente` to normalize names (e.g., merging synonyms) before aggregation.
-3.  **Action Logs**: Counts total dialer actions triggered for the current day.
-4.  **CDR Analytics (`cdr_stats`)**: Uses a MongoDB aggregation pipeline over individual records in `last_reports` for the current day to compute:
-    *   `total_calls`, `average_duration`, `dispositions`.
-5.  **Blocked Contracts Analytics**: Groups active suspended service data by connectivity status (`status_internet`) and speed tier (`status_velocidade`) for historical monitoring.
+1.  **Aggregate Clients**: Total, with open debt, and classification (`pre_force` vs `force`).
+2.  **Aggregate Bills**: Total, expired, and aging stats.
+3.  **Action Logs**: Counts total dialer actions for the current day.
+4.  **CDR Analytics**: Aggregates `last_reports` for daily telephony performance.
+5.  **Blocked Contracts Analytics**: 
+    - **Optimized Storage**: Replaced large contract lists (`list_by`) with aggregated `counts` per status to prevent MongoDB document size overflows.
+    - **Stacked Stats**: Generates distribution statistics for `bairro` and `tipo_cliente` categorized by delay groups (`short`: ≤ 7 days, `long`: > 7 days).
+    - **Age Breakdown**: Aggregates contract counts per debt age, sub-grouped by connectivity status.
+6.  **Store**: Upserts a unified metric document to the `metrics` collection.
+
+### 6. Blocked Contracts Sync (`run_blocked_contracts_job`)
+**Schedule**: Every 30 minutes
+1.  **Fetch**: Retrieves suspended or restricted contracts from IXC.
+2.  **Process**: Normalizes statuses, merges client info, and identifies associated delinquent bills.
+3.  **Upsert**: Updates the `blocked_contracts` collection in MongoDB.
 6.  **Client Types Update (`run_client_types_update_job`)**
 **Schedule**: Weekly (Mondays at 06:00)
 1.  **Fetch**: Retrieves Client Types list from IXC.

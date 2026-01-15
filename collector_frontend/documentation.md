@@ -19,15 +19,15 @@ collector_frontend/
 ├── Dockerfile              # Container definition
 └── pages/
     ├── 1_Instances.py      # Instance Management (CRUD & Config)
-    ├── 2_Dashboard.py      # Main Metrics and CDR Overview
+    ├── 2_Expired_Bills.py  # Monitoring of Open and Expired Invoices
     ├── 3_Blocked_Contracts.py # Monitoring of Suspended Services
     └── 4_Settings.py       # Global system settings
 ```
 
 ## Key Features
 
-### 1. Unified Dashboard (`2_Dashboard.py`)
-Provides a comprehensive overview of the operation with a focus on **Today's Status**:
+### 1. Expired Bills Overview (`2_Expired_Bills.py`)
+Provides a comprehensive overview of the operation with a focus on delinquent invoices:
 - **Clients**: Total active clients vs. clients with open debt. Features specialized horizontal stack charts and centralized KPI cards.
 - **Bills Overview**: 
     - **Proportional Layout**: Expanded center area for the Bill Counts bar graph.
@@ -39,15 +39,15 @@ Provides a comprehensive overview of the operation with a focus on **Today's Sta
     - **Disposition Trend**: A high-fidelity Stacked Area Chart (ECharts) visualizing outcome trends throughout the day.
 - **Auto-Refresh**: The dashboard is hardcoded to refresh every **60 seconds**, ensuring real-time relevance without manual configuration.
 
-### 2. Blocked Contracts (`3_Blocked_Contracts.py`)
+### 2. Blocked Contracts Dashboard (`3_Blocked_Contracts.py`)
 Monitoring and analysis of customers with suspended services:
-- **Metrics Source**: Directly consumes the `blocked_contracts` key from the `metrics` collection.
-- **Historical Charts**:
-    - **Status Velocidade**: Stacked Area Chart showing the trend of speed restriction statuses over time.
-    - **Status Internet**: Stacked Vertical Bar Chart visualizing the distribution of internet connectivity statuses.
-- **Counter Containers**: Color-coded cards reflecting the real-time count for each status type (e.g., Active, Blocked, Limited).
-- **Detailed Inventory**: A single, comprehensive table displaying all blocked contracts with:
-    - `ID Contrato`, `ID Cliente`, `Cliente`, `Status Internet`, `Status Velocidade`, `Data Suspensão`.
+- **Optimized Performance**: Directly consumes aggregated counts from the `metrics` collection, ensuring fast load times even for thousands of contracts.
+- **Vertical Alignment**: Top section features a balanced 4-column layout where counters are vertically stretched to match the height of evolution charts.
+- **Distribution Analysis**:
+    - **Bairro & Tipo Cliente**: Vertical stacked bar charts with delay-based grouping (**Orange** for ≤ 7 days, **Red** for > 7 days).
+    - **Dívida por Atraso**: Stacked bar chart showing the breakdown of debt age, highlighting operational groups.
+- **Evolution Tracking**: Historical Stacked Area and Bar charts for connectivity and speed tier trends.
+- **Detailed Inventory**: Bill-centric tables separated into **Curto Prazo (≤ 7 dias)** and **Longo Prazo (> 7 dias)**, displaying essential columns like `ID Fatura`, `Cliente`, `Valor`, `Vencimento`, and `Status Bloqueio`.
 - **Auto-Refresh**: Synchronized with the 60-second system-wide refresh for real-time monitoring.
 
 ### 3. Instance Management (`1_Instances.py`)
