@@ -318,7 +318,7 @@ with c_stat1:
             "series": [
                 {
                     "name": "≤ 7 dias", "type": "bar", "stack": "total",
-                    "data": df_tc['short'].tolist(), "itemStyle": {"color": "#10b981"}
+                    "data": df_tc['short'].tolist(), "itemStyle": {"color": "#f59e0b"}
                 },
                 {
                     "name": "> 7 dias", "type": "bar", "stack": "total",
@@ -326,7 +326,7 @@ with c_stat1:
                 }
             ]
         }
-        st_echarts(options=options_tc, height="350px", key="blocked_tipo_chart")
+        st_echarts(options=options_tc, height="500px", key="blocked_tipo_chart")
 
 with c_stat2:
     st.markdown("##### 🗺️ Bairro")
@@ -348,7 +348,7 @@ with c_stat2:
             "series": [
                 {
                     "name": "≤ 7 dias", "type": "bar", "stack": "total",
-                    "data": df_b['short'].tolist(), "itemStyle": {"color": "#10b981"}
+                    "data": df_b['short'].tolist(), "itemStyle": {"color": "#f59e0b"}
                 },
                 {
                     "name": "> 7 dias", "type": "bar", "stack": "total",
@@ -356,7 +356,7 @@ with c_stat2:
                 }
             ]
         }
-        st_echarts(options=options_b, height="350px", key="blocked_bairro_chart")
+        st_echarts(options=options_b, height="500px", key="blocked_bairro_chart")
 
 with c_stat3:
     st.markdown("##### ⏳ Dívida por Atraso (Dias)")
@@ -365,31 +365,22 @@ with c_stat3:
         # Sort age stats by the numeric value of the key
         sorted_age_keys = sorted(age_stats.keys(), key=lambda x: int(x) if x.isdigit() else 999)
         
-        # Get unique statuses for series
-        unique_statuses = set()
-        for s_dict in age_stats.values():
-            unique_statuses.update(s_dict.keys())
-        
-        status_series = []
-        for i, status in enumerate(sorted(unique_statuses)):
-            label = internet_labels.get(status, status)
-            data_points = []
-            for k in sorted_age_keys:
-                dp_val = age_stats[k].get(status, 0)
-                data_points.append(dp_val)
-            
-            # Color coding based on age category for non-stacked simple bars? 
-            # No, user wants vertical stacked. So we stack by status.
-            # But the user also wants "separed colors to contracts with bills.expired_age <= 7 and > 7".
-            # For this age chart, X-axis IS the age. So the color difference can be visual.
-            # We can use visualMap or color specific data items.
-            
-            # For simplicity and clarity, let's keep the stacks by status and use colors from net_colors.
-            status_series.append({
-                "name": label, "type": "bar", "stack": "total",
-                "data": data_points,
-                "itemStyle": {"color": net_colors[i % len(net_colors)]}
-            })
+        # Consolidate statuses into two delay-based series
+        short_data = []
+        long_data = []
+        for k in sorted_age_keys:
+            total_for_age = sum(age_stats[k].values())
+            try:
+                age_val = int(k)
+            except:
+                age_val = 999
+                
+            if age_val <= 7:
+                short_data.append(total_for_age)
+                long_data.append(0)
+            else:
+                short_data.append(0)
+                long_data.append(total_for_age)
         
         options_age = {
             "tooltip": {"trigger": "axis", "axisPointer": {"type": "shadow"}},
@@ -398,26 +389,13 @@ with c_stat3:
             "xAxis": {"type": "category", "data": [f"{k}d" for k in sorted_age_keys]},
             "yAxis": {"type": "value"},
             "series": [
-                *status_series,
-                # Use markArea on the first series to highlight groups
                 {
-                    "name": "Background", "type": "bar", "stack": "total", "data": [0] * len(sorted_age_keys),
-                    "markArea": {
-                        "silent": True,
-                        "itemStyle": {"color": "rgba(110, 110, 110, 0.05)"},
-                        "data": [
-                            [{"name": "≤ 7d", "xAxis": "1d" if "1" in sorted_age_keys else sorted_age_keys[0]}, {"xAxis": "7d"}],
-                            [{"name": "> 7d", "xAxis": "8d" if "8" in sorted_age_keys else sorted_age_keys[min(7, len(sorted_age_keys)-1)]}, {"xAxis": sorted_age_keys[-1]}]
-                        ]
-                    }
-                }
-            ],
-            # Add visualMap to highlight short vs long columns background or similar?
-            # Or just let the users see the gap.
-            "graphic": [
+                    "name": "≤ 7 dias", "type": "bar", "stack": "total",
+                    "data": short_data, "itemStyle": {"color": "#f59e0b"}
+                },
                 {
-                    "type": "text", "left": "center", "top": "bottom",
-                    "style": {"text": "≤ 7 dias (Curto Prazo)  |  > 7 dias (Longo Prazo)", "fill": "#64748b", "fontSize": 10}
+                    "name": "> 7 dias", "type": "bar", "stack": "total",
+                    "data": long_data, "itemStyle": {"color": "#ef4444"}
                 }
             ]
         }
