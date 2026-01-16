@@ -102,9 +102,9 @@ def get_historical_metrics(fid, limit=48):    # Fetch last 24-48h roughly
     ))
 
 def get_all_blocked_contracts(fid):
-    # Returns a map of contract_id -> contract_doc for easy lookup
+    # Returns a map of id_contract -> contract_doc for easy lookup
     cursor = db.blocked_contracts.find({"instance_full_id": fid}, {"_id": 0})
-    return {c.get("id"): c for c in cursor}
+    return {c.get("id_contract"): c for c in cursor}
 
 def get_expired_bills(fid):
     return list(db.bills.find({"instance_full_id": fid, "vencimento_status": "expired"}, {"_id": 0}))
@@ -250,7 +250,7 @@ with col1:
         st.info("Sem dados históricos.")
 
 with col2:
-    st.markdown("##### 🌐 Status Internet (Evolução)")
+    st.markdown("##### 🌐 Status Contrato (Evolução)")
     if not df_hist.empty:
         options_net = {
             "tooltip": {"trigger": "axis", "axisPointer": {"type": "shadow"}},
@@ -326,7 +326,7 @@ with c_stat1:
                 }
             ]
         }
-        st_echarts(options=options_tc, height="500px", key="blocked_tipo_chart")
+        st_echarts(options=options_tc, height="400px", key="blocked_tipo_chart")
 
 with c_stat2:
     st.markdown("##### 🗺️ Bairro")
@@ -356,7 +356,7 @@ with c_stat2:
                 }
             ]
         }
-        st_echarts(options=options_b, height="500px", key="blocked_bairro_chart")
+        st_echarts(options=options_b, height="400px", key="blocked_bairro_chart")
 
 with c_stat3:
     st.markdown("##### ⏳ Dívida por Atraso (Dias)")
@@ -385,7 +385,7 @@ with c_stat3:
         options_age = {
             "tooltip": {"trigger": "axis", "axisPointer": {"type": "shadow"}},
             "legend": {"top": 0},
-            "grid": {"left": "3%", "right": "4%", "bottom": "15%", "containLabel": True},
+            "grid": {"left": "3%", "right": "4%", "bottom": "25%", "containLabel": True},
             "xAxis": {"type": "category", "data": [f"{k}d" for k in sorted_age_keys]},
             "yAxis": {"type": "value"},
             "series": [
@@ -399,7 +399,7 @@ with c_stat3:
                 }
             ]
         }
-        st_echarts(options=options_age, height="360px", key="blocked_age_chart")
+        st_echarts(options=options_age, height="400px", key="blocked_age_chart")
     else:
         st.info("Dados de vencimento não disponíveis.")
 
@@ -429,14 +429,15 @@ for bill in expired_bills:
     flat_rows.append({
         "ID Fatura": bill.get("id"),
         "ID Contrato": cid,
-        "Cliente": bill.get("razao") or "Desconhecido",
-        "Bairro": bill.get("bairro"),
-        "Tipo Cliente": bill.get("tipo_cliente"),
+        "Cliente": contract.get("razao") if contract else (bill.get("razao") or "Desconhecido"),
+        "Bairro": contract.get("bairro") if contract else bill.get("bairro"),
+        "Tipo Cliente": contract.get("tipo_cliente") if contract else bill.get("tipo_cliente"),
         "Valor": bill.get("valor_aberto"),
         "Vencimento": bill.get("data_vencimento"),
         "Dias Atraso": bill.get("expired_age"),
         "Status Bloqueio": status_bloqueio
     })
+    
     # Calculate 'Dias Suspenso' (from contract data if available)
     days_susp = 0
     if contract:

@@ -299,6 +299,9 @@ class MetricsService:
             tipo_stats = {}
             for contract in all_blocked:
                 raw_name = contract.get("tipo_cliente")
+                if not raw_name or raw_name == "Indefinido":
+                    raw_name = contract.get("id_tipo_cliente")
+                
                 age = contract.get("expired_age") or 0
                 delay_cat = "short" if age <= 7 else "long"
                 

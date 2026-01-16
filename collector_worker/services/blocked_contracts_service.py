@@ -35,7 +35,11 @@ class BlockedContractsService:
             instance_clients = list(self.db.clients.find({"instance_full_id": self.instance_full_id}))
             client_map = {str(c['id']): c for c in instance_clients} # Map by string ID for safety
 
-            # 3. Fetch expired bills for this instance to relate with blocked contracts
+            # 3. Fetch client types for name resolution
+            client_types_cursor = self.db.client_types.find({"instance_full_id": self.instance_full_id})
+            type_map_names = {str(ct['id']): ct['tipo_cliente'] for ct in client_types_cursor}
+
+            # 4. Fetch expired bills for this instance to relate with blocked contracts
             expired_bills = list(self.db.bills.find({
                 "instance_full_id": self.instance_full_id,
                 "vencimento_status": "expired"
@@ -73,31 +77,30 @@ class BlockedContractsService:
                     processed_item = {
                         "instance_full_id": self.instance_full_id,
                         "instance_name": self.instance_name,
-                        "id": contract_id,
-                        "id_cliente": client_id,
+                        "id_contract": contract_id,
+                        "id_client": client_id,
+                        "id_bill": oldest_bill.get('id') if oldest_bill else None,
                         "contrato": contract.get('contrato'),
-                        "status": contract.get('status'),
+                        "bill_status": oldest_bill.get('status') if oldest_bill else contract.get('status'),
                         "status_internet": contract.get('status_internet'),
                         "status_velocidade": contract.get('status_velocidade'),
-                        "pago_ate_data": contract.get('pago_ate_data'), # Keep as string or date? IXC sends string YYYY-MM-DD usually
+                        "desbloqueio_confianca_ativo": contract.get('desbloqueio_confianca_ativo'),
+                        "pago_ate_data": contract.get('pago_ate_data'), 
                         "num_parcelas_atraso": contract.get('num_parcelas_atraso'),
                         "data_inicial_suspensao": contract.get('data_inicial_suspensao'),
 
                         # Hydrated Data from Client
                         "razao": client_data.get('razao'),
-                        "fantasia": client_data.get('fantasia'),
-                        "cidade": client_data.get('cidade'),
-                        "bairro": client_data.get('bairro'),
-                        "endereco": client_data.get('endereco'),
                         "telefone_celular": client_data.get('telefone_celular'),
+                        "telefone_fixo": client_data.get('telefone_fixo'),
                         "whatsapp": client_data.get('whatsapp'),
+                        "bairro": client_data.get('bairro'),
+                        "id_tipo_cliente": client_data.get('id_tipo_cliente'),
+                        "tipo_cliente": type_map_names.get(str(client_data.get('id_tipo_cliente')), "Indefinido"),
                         
                         # Hydrated Data from Bill
                         "data_vencimento": oldest_bill.get('data_vencimento') if oldest_bill else None,
-                        "dias_vencimento": oldest_bill.get('dias_vencimento') if oldest_bill else None,
                         "expired_age": oldest_bill.get('expired_age') if oldest_bill else None,
-                        "id_tipo_cliente": oldest_bill.get('id_tipo_cliente') if oldest_bill else client_data.get('id_tipo_cliente'),
-                        "tipo_cliente": oldest_bill.get('tipo_cliente') if oldest_bill else client_data.get('tipo_cliente'),
                         
                         "last_updated": datetime.now()
                     }
@@ -113,10 +116,10 @@ class BlockedContractsService:
                 valid_ids = []
                 for pc in processed_contracts:
                     # Unique by instance + contract ID
-                    valid_ids.append(pc['id'])
+                    valid_ids.append(pc['id_contract'])
                     ops.append(
                         UpdateOne(
-                            {"instance_full_id": self.instance_full_id, "id": pc['id']},
+                            {"instance_full_id": self.instance_full_id, "id_contract": pc['id_contract']},
                             {"$set": pc},
                             upsert=True
                         )
@@ -129,7 +132,7 @@ class BlockedContractsService:
                 # Cleanup: Delete those not in current list
                 res = self.db.blocked_contracts.delete_many({
                     "instance_full_id": self.instance_full_id,
-                    "id": {"$nin": valid_ids}
+                    "id_contract": {"$nin": valid_ids}
                 })
                 if res.deleted_count > 0:
                     logger.info(f"Removed {res.deleted_count} stale blocked contracts.")
