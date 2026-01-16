@@ -21,7 +21,8 @@ collector_frontend/
     ├── 1_Instances.py      # Instance Management (CRUD & Config)
     ├── 2_Expired_Bills.py  # Monitoring of Open and Expired Invoices
     ├── 3_Blocked_Contracts.py # Monitoring of Suspended Services
-    └── 4_Settings.py       # Global system settings
+    ├── 4_Collection_Dashboard.py # Operational Control for Manual Recovery
+    └── 5_Settings.py       # Global system settings
 ```
 
 ## Key Features
@@ -54,7 +55,17 @@ Monitoring and analysis of customers with suspended services:
         - **✅ Ativo / Não Bloqueado**: Bill is expired but no technical restriction has been applied to the contract yet.
 - **Auto-Refresh**: Synchronized with the 60-second system-wide refresh for real-time monitoring.
 
-### 3. Instance Management (`1_Instances.py`)
+### 3. Collection Dashboard (`4_Collection_Dashboard.py`)
+Operational command center focused on high-priority manual recovery:
+- **Trust Unlock (DC) Integration**: 
+    - Dedicated KPI for active "Desbloqueio Confiança" contracts.
+    - Vertical stacked bar charts showing the breakdown between Comum and DC contracts sorted by due date.
+- **Action List**: A highly focused list of clients requiring manual contact:
+    - **Filtering**: Specifically includes clients with 8+ days of delay who are either blocked or have an active trust unlock.
+    - **Categorization**: Primary list for immediate contact and an expander for all other overdue items.
+- **Dynamic Context**: Sidebar allows filtering by Instance and Due Date for specialized operational focus.
+
+### 4. Instance Management (`1_Instances.py`)
 Allows for granular control over individual customer instances:
 - **Categorized Form**: UI organized into logical sections (General, ERP, Asterisk/AMI, CDR Database, Collection Rules). Dashboard-specific controls are globally managed and removed from instance forms.
 - **ERP Type Support**: Dropdown selection for multiple ERP integrations (**ixc**, **rbx**, **altarede**).

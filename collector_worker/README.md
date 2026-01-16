@@ -107,12 +107,11 @@ The Service runs on a schedule defined in `main.py`.
     *   **Normalization**: Uses `instance.erp.reverse_map.neighborhood` and `instance.erp.reverse_map.tipo_cliente` to normalize names (e.g., merging synonyms) before aggregation.
 3.  **Action Logs**: Counts total dialer actions triggered for the current day.
     *   **Dashboard Visualization**: These metrics are consumed by the **CDR Overview** section in the frontend, featuring a high-fidelity Stacked Area Chart for disposition trends.
-5. **Blocked Contracts Sync (`run_blocked_contracts_job`)**
-**Schedule**: Every 30 minutes
-1.  **Fetch**: Retrieves the list of contracts with suspended or restricted status from IXC.
-2.  **Process**: Normalizes statuses and merges basic client information.
-3.  **Upsert**: Updates the `blocked_contracts` collection in MongoDB.
-4.  **Log**: Records execution stats to `history_action_log`.
+- **Blocked Contracts Sync**: 
+    - Fetches suspended/restricted contracts from IXC.
+    - **Enriched Metadata**: Injects client details (`razao`, `id_tipo_cliente`, `telefone`, `whatsapp`, etc.) and the oldest expired bill info directly into the contract document.
+    - **Standardized Schema**: Uses `id_contract`, `id_client`, and `id_bill` for consistent internal referencing.
+- **Log**: Records execution stats to `history_action_log`.
 
 ### 5. Metrics Collection (`run_metrics_job`)
 **Schedule**: Every 30 minutes
@@ -129,8 +128,10 @@ The Service runs on a schedule defined in `main.py`.
 ### 6. Blocked Contracts Sync (`run_blocked_contracts_job`)
 **Schedule**: Every 30 minutes
 1.  **Fetch**: Retrieves suspended or restricted contracts from IXC.
-2.  **Process**: Normalizes statuses, merges client info, and identifies associated delinquent bills.
-3.  **Upsert**: Updates the `blocked_contracts` collection in MongoDB.
+2.  **Hydration**: Resolves `id_tipo_cliente` to its descriptive name and attaches primary contact info.
+3.  **Bill Mapping**: Identifies the oldest delinquent invoice and attaches its `id_bill`, `bill_status`, and `expired_age`.
+4.  **Upsert**: Updates the `blocked_contracts` collection using `id_contract` as the primary key.
+5.  **Cleanup**: Automatically removes stale blocked contracts not present in the latest ERP fetch.
 6.  **Client Types Update (`run_client_types_update_job`)**
 **Schedule**: Weekly (Mondays at 06:00)
 1.  **Fetch**: Retrieves Client Types list from IXC.

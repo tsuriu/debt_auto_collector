@@ -6,8 +6,8 @@ A professional, high-fidelity ecosystem for automating debt collection. This pro
 
 The project is composed of two main Python components and a database:
 
-- **[Collector Worker](file:///Users/tulioamancio/Scripts/tsuriuTech/debt_auto_collector/collector_worker/documentation.md)**: Background service that orchestrates data syncing (IXC ERP), call triggers (Asterisk ARI), and metrics generation.
-- **[Collector Frontend](file:///Users/tulioamancio/Scripts/tsuriuTech/debt_auto_collector/collector_frontend/documentation.md)**: Interactive Streamlit dashboard for data visualization and instance configuration.
+- **[Collector Worker](file:///Users/tulioamancio/Scripts/tsuriuTech/debt_auto_collector/collector_worker/documentation.md)**: Background service that orchestrates data syncing (IXC ERP), processing (Hydrating client/bill metadata), and metrics generation.
+- **[Collector Frontend](file:///Users/tulioamancio/Scripts/tsuriuTech/debt_auto_collector/collector_frontend/documentation.md)**: Interactive Streamlit dashboards (Monitoring, Blocked Contracts, Collection Control) and instance configuration.
 - **MongoDB**: Centralized storage for clients, bills, metrics, and configurations.
 
 ## 🚀 Quick Start (Docker)
@@ -41,15 +41,19 @@ The fastest way to run the entire stack is via Docker Compose:
 - **Real-time Monitoring**: Comprehensive KPIs for active clients, debt volume, and daily collection status.
 - **Automated Refresh**: Hardcoded 60-second auto-refresh across all dashboard views for consistent real-time monitoring.
 - **Expired Bills Focus**: Specialized view for tracking and analyzing delinquent invoices with aging breakdowns and payment trends.
-- **Blocked Contracts Dashboard**: Dedicated monitoring for suspended services featuring:
-    - **Evolution Tracking**: Historical charts for internet and speed status trends.
-    - **Bairro & Tipo Cliente Analysis**: Vertical stacked charts grouped by short/long delay cohorts.
-    - **Operational Grouping**: Detailed bill-centric tables separated into **Curto Prazo (≤ 7 dias)** and **Longo Prazo (> 7 dias)** to prioritize collection.
+- **Blocked Contracts Dashboard**: Specialized monitoring for suspended services:
+    - **Evolution Tracking**: Trend analysis for connectivity and speed tier states.
+    - **Demographic Breakdown**: Distribution by Bairro and Client Type with delay cohort grouping.
+    - **Inventory Management**: Prioritized tables for **Curto Prazo (≤ 7 dias)** and **Longo Prazo (> 7 dias)**.
+- **Collection Dashboard**: Operational command center for manual recovery:
+    - **Trust Unlock (DC) Integration**: Real-time counters and stacked visualizations for "Desbloqueio Confiança" status.
+    - **Action List**: Focus on high-priority contacts (8+ days delay) who are already blocked or using their trust unlock.
+    - **Quantity-Based Distribution**: Vertical stacked bar charts showing Comum vs. DC counts per due date.
 - **Advanced Visualizations**:
-    - **CDR Overview**: Outcome counts in color-coded horizontal boxes and high-fidelity daily trend area charts.
-    - **Color-Coded Cohorts**: Use of distinct colors (**Orange** for ≤ 7 days, **Red** for > 7 days) across all distribution charts.
+    - **CDR Performance**:outcome analysis with high-fidelity daily trend charts.
+    - **Color-Coded Analysis**: Unified status colors (**Orange** for short-term, **Red** for critical delays).
 - **Robust Configuration**:
-    - Categorized form-based management for multiple ERP types (**ixc**, **rbx**, **altarede**).
+    - Multi-ERP support (**ixc**, **rbx**, **altarede**) with specialized reverse mapping for data normalization.
     - Integrated **Form/JSON Toggle** for advanced technical configurations.
 
 ## 🛠️ Development
